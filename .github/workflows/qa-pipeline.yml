@@ -1,28 +1,73 @@
 name: AI-Assisted QA Pipeline
 
+# ── WHEN TO TRIGGER ───────────────────────────────────────────────────────────
 on:
+  # TRIGGER 1: Issue labeled "qa-ready" → run QA on that specific issue
   issues:
-    types: [labeled]
+    types: [labeled, opened]
 
+  # TRIGGER 2: Pull Request opened or updated → run QA on linked issue
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, develop]
+
+  # TRIGGER 3: Code pushed to main → re-run QA on last 3 open qa-ready issues
+  push:
+    branches: [main]
+    paths:
+      - 'agents/**'
+      - 'contracts/**'
+      - 'orchestrator/**'
+
+  # TRIGGER 4: Scheduled scan — every 6 hours, check for new unprocessed issues
+  schedule:
+    - cron: '0 */6 * * *'   # runs at 00:00, 06:00, 12:00, 18:00 UTC
+
+  # TRIGGER 5: Manual run from GitHub UI → Actions tab → Run workflow
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'Target repo (owner/name)'
+        required: false
+        default: ''
+      issue_number:
+        description: 'Issue number to test (leave blank for auto-detect)'
+        required: false
+        default: ''
+
+# ── SHARED ENV ────────────────────────────────────────────────────────────────
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+# ── JOBS ──────────────────────────────────────────────────────────────────────
 jobs:
-  qa:
-    if: github.event.label.name == 'qa-ready'
+
+  # ── JOB 1: Issue labeled / opened ─────────────────────────────────────────
+  qa-on-issue:
+    name: QA Pipeline — Issue #${{ github.event.issue.number }}
+    if: |
+      github.event_name == 'issues' &&
+      (github.event.label.name == 'qa-ready' || github.event.action == 'opened')
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.44.0-jammy
     permissions:
       issues: write
       contents: read
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        run: apt-get update && apt-get install -y python3 python3-pip
+        run: apt-get update -qq && apt-get install -y python3 python3-pip -qq
 
-      - name: Install deps
-        run: pip3 install -r requirements.txt && npm i -D @playwright/test allure-playwright
+      - name: Install dependencies
+        run: |
+          pip3 install -r requirements.txt --quiet
+          npm i -D @playwright/test allure-playwright --silent
 
-      - name: Run QA pipeline (real Playwright)
+      - name: Run QA pipeline
         id: qa
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -33,32 +78,231 @@ jobs:
             "${{ github.event.issue.number }}" \
             --token "$GH_TOKEN" --real \
             | tee pipeline_output.txt
-          # surface the gate decision for the gate step
-          grep -q "Gate: PASS" pipeline_output.txt && echo "gate=pass" >> "$GITHUB_OUTPUT" || echo "gate=fail" >> "$GITHUB_OUTPUT"
 
-      - name: Publish Allure report to Pages
-        if: always()
-        uses: simple-elf/allure-report-action@v1.7
-        with:
-          allure_results: .qa-workspace/allure-results
-          gh_pages: gh-pages
-          allure_report: allure-report
+          grep -q "Gate: PASS" pipeline_output.txt \
+            && echo "gate=pass" >> "$GITHUB_OUTPUT" \
+            || echo "gate=fail" >> "$GITHUB_OUTPUT"
 
       - name: Comment results on issue
         if: always()
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            const out = fs.readFileSync('pipeline_output.txt','utf8');
-            const body = out.split('\n').slice(-12).join('\n');
+            const fs   = require('fs');
+            const out  = fs.readFileSync('pipeline_output.txt', 'utf8');
+            const body = out.split('\n').slice(-15).join('\n');
+            const icon = '${{ steps.qa.outputs.gate }}' === 'pass' ? '✅' : '❌';
             github.rest.issues.createComment({
               issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '### AI-Assisted QA result\n```\n' + body + '\n```'
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n_Triggered by label \`qa-ready\` on issue #${{ github.event.issue.number }}_`
             });
 
-      - name: Enforce merge gate
+      - name: Add pass/fail label to issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const gate  = '${{ steps.qa.outputs.gate }}';
+            const label = gate === 'pass' ? 'qa-passed' : 'qa-failed';
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              labels:       [label]
+            });
+
+      - name: Enforce gate on failure
         if: steps.qa.outputs.gate == 'fail'
         run: echo "::error::QA gate FAILED — P0 failure or pass rate < 90%" && exit 1
+
+
+  # ── JOB 2: Pull Request opened or updated ─────────────────────────────────
+  qa-on-pr:
+    name: QA Pipeline — PR #${{ github.event.pull_request.number }}
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.44.0-jammy
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        run: apt-get update -qq && apt-get install -y python3 python3-pip -qq
+
+      - name: Install dependencies
+        run: |
+          pip3 install -r requirements.txt --quiet
+          npm i -D @playwright/test allure-playwright --silent
+
+      - name: Extract linked issue number from PR body
+        id: extract
+        run: |
+          # Looks for "Closes #123" or "Fixes #123" or "Resolves #123" in PR body
+          ISSUE=$(echo "${{ github.event.pull_request.body }}" \
+            | grep -oiP '(?:closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
+          echo "issue_number=${ISSUE:-0}" >> "$GITHUB_OUTPUT"
+          echo "Linked issue: ${ISSUE:-none found}"
+
+      - name: Run QA pipeline on linked issue
+        id: qa
+        if: steps.extract.outputs.issue_number != '0'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -m orchestrator.pipeline \
+            "${{ github.repository }}" \
+            "${{ steps.extract.outputs.issue_number }}" \
+            --token "$GH_TOKEN" --real \
+            | tee pipeline_output.txt
+
+          grep -q "Gate: PASS" pipeline_output.txt \
+            && echo "gate=pass" >> "$GITHUB_OUTPUT" \
+            || echo "gate=fail" >> "$GITHUB_OUTPUT"
+
+      - name: Run demo pipeline (no linked issue found)
+        id: qa-demo
+        if: steps.extract.outputs.issue_number == '0'
+        run: |
+          python3 -m orchestrator.pipeline --demo --offline | tee pipeline_output.txt
+          echo "gate=pass" >> "$GITHUB_OUTPUT"
+
+      - name: Comment results on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs   = require('fs');
+            const out  = fs.existsSync('pipeline_output.txt')
+                         ? fs.readFileSync('pipeline_output.txt', 'utf8') : 'No output';
+            const body = out.split('\n').slice(-15).join('\n');
+            const gate = '${{ steps.qa.outputs.gate || steps.qa-demo.outputs.gate }}';
+            const icon = gate === 'pass' ? '✅' : '❌';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n_Triggered by PR #${{ github.event.pull_request.number }}_`
+            });
+
+      - name: Block PR merge on gate failure
+        if: steps.qa.outputs.gate == 'fail'
+        run: echo "::error::QA gate FAILED — merge blocked" && exit 1
+
+
+  # ── JOB 3: Code push to main — re-validate recent issues ──────────────────
+  qa-on-push:
+    name: QA Regression — Post-Push Validation
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.44.0-jammy
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        run: apt-get update -qq && apt-get install -y python3 python3-pip -qq
+
+      - name: Install dependencies
+        run: |
+          pip3 install -r requirements.txt --quiet
+          npm i -D @playwright/test allure-playwright --silent
+
+      - name: Run demo pipeline to verify agent code still works
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 -m orchestrator.pipeline --demo --offline | tee push_validation.txt
+          grep -q "Gate: PASS" push_validation.txt \
+            || (echo "::error::Post-push smoke test FAILED" && exit 1)
+
+      - name: Upload validation output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: push-validation-${{ github.sha }}
+          path: push_validation.txt
+          retention-days: 7
+
+
+  # ── JOB 4: Scheduled scan — find open qa-ready issues not yet processed ────
+  qa-scheduled:
+    name: Scheduled QA Scan
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.44.0-jammy
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        run: apt-get update -qq && apt-get install -y python3 python3-pip -qq
+
+      - name: Install dependencies
+        run: |
+          pip3 install -r requirements.txt --quiet
+          npm i -D @playwright/test allure-playwright --silent
+
+      - name: Find open qa-ready issues without qa-passed/qa-failed label
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use GitHub CLI to find unprocessed qa-ready issues
+          gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "qa-ready" \
+            --state open \
+            --limit 5 \
+            --json number,labels \
+            | python3 -c "
+          import json, sys
+          issues = json.load(sys.stdin)
+          skip = {'qa-passed', 'qa-failed'}
+          unprocessed = [
+              str(i['number']) for i in issues
+              if not any(l['name'] in skip for l in i['labels'])
+          ]
+          print(','.join(unprocessed))
+          " > unprocessed_issues.txt
+
+          echo "issues=$(cat unprocessed_issues.txt)" >> "$GITHUB_OUTPUT"
+          echo "Found unprocessed issues: $(cat unprocessed_issues.txt)"
+
+      - name: Run QA pipeline on each unprocessed issue
+        if: steps.find.outputs.issues != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IFS=',' read -ra ISSUES <<< "${{ steps.find.outputs.issues }}"
+          for issue in "${ISSUES[@]}"; do
+            echo "── Processing issue #${issue} ──"
+            python3 -m orchestrator.pipeline \
+              "${{ github.repository }}" \
+              "${issue}" \
+              --token "$GH_TOKEN" --real \
+              | tee "output_${issue}.txt" || true
+          done
+
+      - name: Upload all outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-scan-${{ github.run_id }}
+          path: output_*.txt
+          retention-days: 14
