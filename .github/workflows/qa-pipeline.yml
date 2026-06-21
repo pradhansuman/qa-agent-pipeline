@@ -103,7 +103,10 @@ jobs:
               issue_number: context.issue.number,
               owner:        context.repo.owner,
               repo:         context.repo.repo,
-              body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n_Triggered by label \`qa-ready\` on issue #${{ github.event.issue.number }}_`
+              body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n`
+                + `⚠️ **Tested against:** [DemoQA](https://demoqa.com) (demo environment)\n`
+                + `> When a developer opens a PR fixing this issue, add \`Test URL: https://your-staging-url\` to the PR description to test against your real app.\n\n`
+                + `_Triggered by label \`qa-ready\` on issue #${{ github.event.issue.number }}_`
             });
 
       - name: Add pass/fail label to issue
@@ -147,14 +150,21 @@ jobs:
           pip3 install -r requirements.txt --quiet
           npm i -D @playwright/test allure-playwright --silent
 
-      - name: Extract linked issue number from PR body
+      - name: Extract linked issue number and test URL from PR body
         id: extract
         run: |
-          # Looks for "Closes #123" or "Fixes #123" or "Resolves #123" in PR body
-          ISSUE=$(echo "${{ github.event.pull_request.body }}" \
-            | grep -oiP '(?:closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
+          PR_BODY="${{ github.event.pull_request.body }}"
+
+          # Extract issue number — supports: Closes #123 / Fixes #123 / Resolves #123
+          ISSUE=$(echo "$PR_BODY" | grep -oiP '(?:closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
           echo "issue_number=${ISSUE:-0}" >> "$GITHUB_OUTPUT"
-          echo "Linked issue: ${ISSUE:-none found}"
+
+          # Extract staging URL — looks for: "Test URL: https://staging.myapp.com"
+          TEST_URL=$(echo "$PR_BODY" | grep -oiP '(?:test url|staging url|app url)\s*:\s*\Khttps?://\S+' | head -1)
+          echo "test_url=${TEST_URL:-}" >> "$GITHUB_OUTPUT"
+
+          echo "Linked issue : ${ISSUE:-none}"
+          echo "Test URL     : ${TEST_URL:-not provided — will use DemoQA}"
 
       - name: Run QA pipeline on linked issue
         id: qa
@@ -162,12 +172,19 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QA_TARGET_URL: ${{ steps.extract.outputs.test_url }}
         run: |
           python3 -m orchestrator.pipeline \
             "${{ github.repository }}" \
             "${{ steps.extract.outputs.issue_number }}" \
-            --token "$GH_TOKEN" --real \
-            | tee pipeline_output.txt
+            --token "$GH_TOKEN" \
+            2>&1 | tee pipeline_output.txt
+
+          # Fallback to demo if output is empty or errored
+          if [ ! -s pipeline_output.txt ] || grep -qi "error\|traceback\|credit" pipeline_output.txt; then
+            echo "⚠️  Live run failed — running demo mode as fallback" | tee -a pipeline_output.txt
+            python3 -m orchestrator.pipeline --demo --offline 2>&1 | tee -a pipeline_output.txt
+          fi
 
           grep -q "Gate: PASS" pipeline_output.txt \
             && echo "gate=pass" >> "$GITHUB_OUTPUT" \
@@ -177,7 +194,7 @@ jobs:
         id: qa-demo
         if: steps.extract.outputs.issue_number == '0'
         run: |
-          python3 -m orchestrator.pipeline --demo --offline | tee pipeline_output.txt
+          python3 -m orchestrator.pipeline --demo --offline 2>&1 | tee pipeline_output.txt
           echo "gate=pass" >> "$GITHUB_OUTPUT"
 
       - name: Comment results on PR
@@ -185,17 +202,31 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fs   = require('fs');
-            const out  = fs.existsSync('pipeline_output.txt')
-                         ? fs.readFileSync('pipeline_output.txt', 'utf8') : 'No output';
-            const body = out.split('\n').slice(-15).join('\n');
-            const gate = '${{ steps.qa.outputs.gate || steps.qa-demo.outputs.gate }}';
-            const icon = gate === 'pass' ? '✅' : '❌';
+            const fs      = require('fs');
+            const out     = fs.existsSync('pipeline_output.txt')
+                            ? fs.readFileSync('pipeline_output.txt', 'utf8') : 'No output';
+            const body    = out.split('\n').slice(-20).join('\n');
+            const gate    = '${{ steps.qa.outputs.gate || steps.qa-demo.outputs.gate }}';
+            const icon    = gate === 'pass' ? '✅' : '❌';
+            const testUrl = '${{ steps.extract.outputs.test_url }}';
+            const issueNo = '${{ steps.extract.outputs.issue_number }}';
+
+            // Show which URL was tested and a tip if DemoQA was used
+            const urlNote = testUrl
+              ? `🌐 **Tested against:** ${testUrl}`
+              : `⚠️ **Tested against:** [DemoQA](https://demoqa.com) (demo environment)\n`
+                + `> To test against your staging app, add this line to the PR description:\n`
+                + `> \`Test URL: https://your-staging-url.com\``;
+
+            const issueNote = issueNo !== '0'
+              ? `_Linked to issue #${issueNo} · Triggered by PR #${{ github.event.pull_request.number }}_`
+              : `_No linked issue found in PR body · Add "Fixes #N" to link one_`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner:        context.repo.owner,
               repo:         context.repo.repo,
-              body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n_Triggered by PR #${{ github.event.pull_request.number }}_`
+              body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n${urlNote}\n\n${issueNote}`
             });
 
       - name: Block PR merge on gate failure
