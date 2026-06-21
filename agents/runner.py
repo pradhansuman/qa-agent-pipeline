@@ -45,14 +45,23 @@ class RunnerAgent:
     # ── real Playwright run ─────────────────────────────────────
     def _run_real(self, suite: GeneratedSuite) -> RunResults:
         self._materialise(suite)
-        subprocess.run(
+        result = subprocess.run(
             ["npx", "playwright", "test", "--reporter=json"],
             cwd=self.workspace,
             capture_output=True,
             text=True,
             check=False,
         )
-        report = json.loads((self.workspace / "results.json").read_text())
+        # Playwright JSON reporter writes to stdout — save it to a file
+        results_path = self.workspace / "results.json"
+        if result.stdout.strip():
+            results_path.write_text(result.stdout, encoding="utf-8")
+        if not results_path.exists():
+            raise RuntimeError(
+                f"Playwright produced no output (exit {result.returncode}).\n"
+                f"Stderr: {result.stderr[:800]}"
+            )
+        report = json.loads(results_path.read_text())
 
         results: list[TestResult] = []
         for spec in report.get("suites", []):

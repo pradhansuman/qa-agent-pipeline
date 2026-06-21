@@ -70,15 +70,14 @@ jobs:
 
       - name: Extract app URL from issue body
         id: extract_url
-        run: |
-          # Look for "App URL: https://..." or "Test URL: https://..." in the issue body
-          ISSUE_URL=$(cat <<'ISSUEBODY'
-          ${{ github.event.issue.body }}
-          ISSUEBODY
-          echo "$ISSUE_URL" | grep -oiP '(?:app url|test url|url)\s*:\s*\Khttps?://\S+' | head -1 > app_url.txt || true)
-          APP_URL=$(cat app_url.txt 2>/dev/null || echo "")
-          echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
-          echo "Detected app URL: ${APP_URL:-not found in issue body — will use DemoQA}"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const match = body.match(/(?:app url|test url|url)\s*:\s*(https?:\/\/\S+)/i);
+            const url = match ? match[1].trim() : '';
+            core.setOutput('app_url', url);
+            console.log('Detected app URL:', url || 'not found — will use DemoQA');
 
       - name: Run QA pipeline
         id: qa
