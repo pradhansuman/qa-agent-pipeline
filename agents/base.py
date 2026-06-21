@@ -19,7 +19,7 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
-MODEL = os.environ.get("QA_AGENT_MODEL", "claude-sonnet-4-20250514")
+MODEL = os.environ.get("QA_AGENT_MODEL", "claude-haiku-4-5-20251001")
 
 
 class AgentResponseError(RuntimeError):
