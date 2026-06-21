@@ -1,0 +1,102 @@
+Product Requirements Document (PRD)
+Project Name: Speedtest Core Web Engine Automation
+
+1. Product Overview & Core Objective
+Speedtest.net is a high-traffic web application designed to measure internet connection performance metrics:
+Ping (Latency), Jitter, Download Speed, and Upload Speed.
+
+The purpose of this document is to define the functional requirements and technical locators for building an
+automated end-to-end framework that validates the network measurement lifecycle, ad-delivery resilience,
+server selection, and user telemetry logging.
+
+2. Core User Journeys & Functional Requirements
+
+Flow 1: Guest Speed Test Execution (Happy Path)
+Trigger: User navigates to the landing page and clicks the prominent "GO" button.
+
+- State 1: Pre-test Navigation — The system must automatically detect the user's optimal testing server
+  based on IP/Geo-location. The interface must display the detected ISP name and the designated test
+  server before execution begins.
+
+- State 2: Latency & Jitter Measurement — Upon clicking "GO", the engine performs a ping sweep. The
+  gauge must animate, and real-time numerical updates must display current Latency (ms) and Jitter (ms).
+
+- State 3: Download Test — The gauge dynamically scales up. The graph renders a real-time progress
+  curve reflecting data chunk downloads.
+
+- State 4: Upload Test — The gauge shifts color/state to indicate upstream testing. Progress curve renders
+  upstream bandwidth.
+
+- State 5: Results Presentation — Final, immutable metrics for Ping, Jitter, Download (Mbps), and Upload
+  (Mbps) must display on a finalized result card. A unique "Result ID" string must be extracted from the DOM
+  or URL for backend telemetry verification.
+
+Flow 2: Custom Server Selection
+Trigger: User clicks the "Change Server" anchor link.
+Action: A modal overlay appears displaying a search input field and a list of nearby alternative testing servers.
+Verification: Searching a city (e.g., "Bhubaneswar") must dynamically filter the list. Selecting a new server
+must close the modal and update the landing page server text node.
+
+3. Critical UI Locator & Element Strategy
+
+Go Button:
+  - Selector: role=button[name="GO"i] or css=.js-starttest
+  - Action: Click to initiate test suite
+
+ISP Display:
+  - Selector: css=[data-testid="host-isp-name"] or css=.js-data-isp
+  - Verify text node matches expected provider
+
+Server Selection Link:
+  - Selector: role=link[name="Change Server"i]
+  - Action: Click to open change server modal
+
+Download Metric Result:
+  - Selector: css=[data-testid="download-speed"] or css=.download-speed
+  - Verify final text numeric value > 0.00
+
+Upload Metric Result:
+  - Selector: css=[data-testid="upload-speed"] or css=.upload-speed
+  - Verify final text numeric value > 0.00
+
+Ping Result Value:
+  - Selector: css=[data-testid="ping-value"] or css=.ping-speed
+  - Verify value exists as a valid integer
+
+Result ID Badge:
+  - Selector: css=.result-id or role=link[name*="resultid"]
+  - Extract alphanumeric string for backend validation
+
+4. Technical Constraints & Edge Cases for Automation
+
+- Variable Execution Timelines: A speed test duration fluctuates entirely based on the local environment's
+  network performance. Hardcoded explicit waits (sleep()) are strictly prohibited. The framework must
+  use event-driven polling (e.g., waiting for the "Result Card" element to become visible, or waiting up to a
+  maximum 120-second timeout for the gauge to reach its terminal state).
+
+- Ad and Pop-up Resilience: Third-party display advertising scripts load aggressively on the canvas. The
+  framework must run with localized ad-blocking parameters or natively configure Playwright to intercept and
+  block network requests matching known ad networks (*doubleclick.net*, *googlesyndication.com*)
+  to ensure execution stability.
+
+- Network Throttling Validation: To verify the framework's measurement accuracy, it must run fine across
+  varying environments. The configuration file must support emulation modes for simulated slow networks to
+  verify that the automation script handles slower data loading thresholds gracefully without throwing locator
+  timeouts.
+
+5. Backend & API Telemetry Requirements
+
+Endpoint: GET /api/v1/results/{resultId}
+
+Validation: The AI agent's framework must execute a direct API request using the Result ID scraped from
+the UI at the end of a test run. The JSON response object payload must match the UI displayed values exactly:
+
+{
+  "resultId": "123456789",
+  "status": "completed",
+  "metrics": {
+    "downloadMbps": 145.2,
+    "uploadMbps": 89.7,
+    "pingMs": 12
+  }
+}

@@ -1,0 +1,12 @@
+[
+  { "id": 1,  "name": "Wireless Headphones",    "price": 79.99,  "btnId": "btn-1"  },
+  { "id": 2,  "name": "Gaming Keyboard",         "price": 119.00, "btnId": "btn-2"  },
+  { "id": 3,  "name": "Portable Charger",        "price": 39.95,  "btnId": "btn-3"  },
+  { "id": 4,  "name": "Desk Lamp",               "price": 34.99,  "btnId": "btn-4"  },
+  { "id": 5,  "name": "Running Shoes",           "price": 89.00,  "btnId": "btn-5"  },
+  { "id": 6,  "name": "Stainless Water Bottle",  "price": 24.99,  "btnId": "btn-6"  },
+  { "id": 7,  "name": "Yoga Mat",                "price": 49.99,  "btnId": "btn-7"  },
+  { "id": 8,  "name": "Bluetooth Speaker",       "price": 59.99,  "btnId": "btn-8"  },
+  { "id": 9,  "name": "UV Sunglasses",           "price": 29.95,  "btnId": "btn-9"  },
+  { "id": 10, "name": "Notebook Set",            "price": 18.00,  "btnId": "btn-10" }
+]

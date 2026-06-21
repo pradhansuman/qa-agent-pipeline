@@ -1,0 +1,53 @@
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.env
+.env.*
+*.env
+
+# ── Node / Playwright ─────────────────────────────────────────────
+node_modules/
+generated/*/node_modules/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+blob-report/
+*.zip
+
+# ── Claude Code local settings (personal tool config, not project) ──
+.claude/
+
+# ── macOS ─────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────────
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+
+# ── Secrets / credentials (never commit these) ────────────────────
+*.pem
+*.key
+*.p12
+secrets.json
+credentials.json
+
+# ── Generated resume / personal files ────────────────────────────
+Suman/
+Suman_Pradhan_ATS_Resume.*
+generate_resume_pdf.py
