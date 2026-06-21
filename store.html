@@ -208,27 +208,27 @@
 
 <header>
   <h1>ShopNow</h1>
-  <button id="cart-btn" onclick="toggleCart()">🛒 (<span id="cart-count">0</span>)</button>
+  <button id="cart-btn" data-testid="cart-btn" onclick="toggleCart()">🛒 (<span id="cart-count" data-testid="cart-count">0</span>)</button>
 </header>
 
 <main>
   <h2>Shop Our Collection</h2>
-  <div class="grid" id="product-grid"></div>
+  <div class="grid" id="product-grid" data-testid="product-grid"></div>
 </main>
 
 <div class="overlay" id="overlay" onclick="toggleCart()"></div>
-<div class="cart-sidebar" id="cart-sidebar">
+<div class="cart-sidebar" id="cart-sidebar" data-testid="cart-sidebar">
   <div class="cart-header">
     <h3>Shopping Cart</h3>
     <button class="close-btn" onclick="toggleCart()">&#x2715;</button>
   </div>
-  <div class="cart-items" id="cart-items"></div>
+  <div class="cart-items" id="cart-items" data-testid="cart-items"></div>
   <div class="cart-footer">
     <div class="cart-total">
       <span>Total</span>
-      <span id="cart-total">$0.00</span>
+      <span id="cart-total" data-testid="cart-total">$0.00</span>
     </div>
-    <button class="checkout-btn" id="checkout-btn" onclick="checkout()" disabled>
+    <button class="checkout-btn" id="checkout-btn" data-testid="checkout-btn" onclick="checkout()" disabled>
       Complete Purchase
     </button>
   </div>
@@ -256,14 +256,14 @@
   function renderProducts() {
     const grid = document.getElementById("product-grid");
     grid.innerHTML = PRODUCTS.map(p => `
-      <div class="card">
+      <div class="card" data-testid="product-card" data-product-id="${p.id}">
         <div class="card-img">${p.emoji}</div>
         <div class="card-body">
-          <div class="card-name">${p.name}</div>
+          <div class="card-name" data-testid="product-name">${p.name}</div>
           <div class="card-desc">${p.desc}</div>
-          <div class="card-price">$${p.price.toFixed(2)}</div>
+          <div class="card-price" data-testid="product-price">$${p.price.toFixed(2)}</div>
         </div>
-        <button class="add-btn" id="btn-${p.id}" onclick="addToCart(${p.id})">Buy Now</button>
+        <button class="add-btn" id="btn-${p.id}" data-testid="add-to-cart-${p.id}" onclick="addToCart(${p.id})">Buy Now</button>
       </div>
     `).join("");
   }
