@@ -44,12 +44,13 @@ env:
 # ── JOBS ──────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ── JOB 1: Issue labeled / opened ─────────────────────────────────────────
+  # ── JOB 1: Issue labeled / opened / manually triggered ───────────────────
   qa-on-issue:
-    name: QA Pipeline — Issue #${{ github.event.issue.number }}
+    name: QA Pipeline — Issue #${{ github.event.issue.number || inputs.issue_number }}
     if: |
-      github.event_name == 'issues' &&
-      (github.event.label.name == 'qa-ready' || github.event.action == 'opened')
+      (github.event_name == 'issues' &&
+       (github.event.label.name == 'qa-ready' || github.event.action == 'opened')) ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.44.0-jammy
@@ -87,9 +88,10 @@ jobs:
           QA_TARGET_URL: ${{ steps.extract_url.outputs.app_url }}
         run: |
           # Run real pipeline — capture stdout+stderr; save exit code via PIPESTATUS
+          ISSUE_NUM="${{ github.event.issue.number || inputs.issue_number }}"
           python3 -m orchestrator.pipeline \
             "${{ github.repository }}" \
-            "${{ github.event.issue.number }}" \
+            "$ISSUE_NUM" \
             --token "$GH_TOKEN" --real \
             2>&1 | tee pipeline_output.txt
           REAL_EXIT=${PIPESTATUS[0]}
@@ -134,7 +136,7 @@ jobs:
               owner:        context.repo.owner,
               repo:         context.repo.repo,
               body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n${urlNote}\n\n`
-                + `_Triggered by label \`qa-ready\` on issue #${{ github.event.issue.number }}_`
+                + `_Triggered on issue #${{ github.event.issue.number || inputs.issue_number }}_`
             });
 
       - name: Add pass/fail label to issue
