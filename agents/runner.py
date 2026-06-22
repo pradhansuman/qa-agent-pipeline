@@ -118,6 +118,40 @@ class RunnerAgent:
                     content = content.replace(f'[data-testid={q}{wrong}{q}]', f'[data-testid="{right}"]')
                     content = content.replace(f'getByTestId({q}{wrong}{q})', f'getByTestId("{right}")')
 
+            # Fix math_hub selector drift: LLM uppercases "ch" → "CH" or keeps
+            # "chapter-CHxx" format instead of "chapter-N" (numeric).
+            # nav-CH05 → nav-ch05 ; nav-CH5 → nav-ch05
+            def _fix_nav_ch(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'[data-testid="nav-ch{n:02d}"]'
+            content = re.sub(
+                r'\[data-testid=["\']nav-CH(\d+)["\']\]',
+                _fix_nav_ch, content,
+            )
+            def _fix_nav_ch_gbt(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'getByTestId("nav-ch{n:02d}")'
+            content = re.sub(
+                r'getByTestId\(["\']nav-CH(\d+)["\']\)',
+                _fix_nav_ch_gbt, content,
+            )
+
+            # chapter-CHxx or chapter-chxx or chapter-ch-xx → chapter-N
+            def _fix_ch_section(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'[data-testid="chapter-{n}"]'
+            content = re.sub(
+                r'\[data-testid=["\']chapter-[Cc][Hh]-?(\d+)["\']\]',
+                _fix_ch_section, content,
+            )
+            def _fix_ch_section_gbt(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'getByTestId("chapter-{n}")'
+            content = re.sub(
+                r'getByTestId\(["\']chapter-[Cc][Hh]-?(\d+)["\']\)',
+                _fix_ch_section_gbt, content,
+            )
+
             # Fix "click card then click add-to-cart globally" anti-pattern.
             # LLM sometimes generates:
             #   await cards[i].click();            <- clicking the card has no handler
