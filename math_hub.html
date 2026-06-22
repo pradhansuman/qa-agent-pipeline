@@ -1041,7 +1041,7 @@
 </section>
 
 <!-- ── Score Tracker ── -->
-<div id="score-bar" data-testid="score-bar">
+<div id="score-bar" data-testid="score-bar" data-score="0">
   Score: <span id="scoreText">0 / 0</span>
 </div>
 
@@ -1050,6 +1050,7 @@
   let attempted = 0, correct = 0;
   function updateScore() {
     document.getElementById('scoreText').textContent = correct + ' / ' + attempted;
+    document.getElementById('score-bar').setAttribute('data-score', correct);
   }
 
   // ── MCQ engine ──

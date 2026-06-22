@@ -140,9 +140,10 @@ class RunnerAgent:
             # ── MCQ testid normalisation ─────────────────────────────────────────────
             # Valid pattern: ch01-q1-a through ch16-q3-d
             # LLM drift patterns:
-            #   ch01-mcq-q1-a    → ch01-q1-a   (extra 'mcq-' prefix)
-            #   ch01-quiz-q1-a   → ch01-q1-a   (uses 'quiz-' instead of nothing)
-            #   ch01-question-1-a → ch01-q1-a  (uses 'question-N' instead of 'qN')
+            #   ch01-mcq-q1-a      → ch01-q1-a   (extra 'mcq-' prefix)
+            #   ch01-quiz-q1-a     → ch01-q1-a   (uses 'quiz-' instead of nothing)
+            #   ch01-question-1-a  → ch01-q1-a   (uses 'question-N' instead of 'qN')
+            #   mcq-q1-option-a    → ch01-q1-a   (no chapter prefix, uses 'option-')
             content = re.sub(
                 r'\b(ch\d\d)-(?:mcq|quiz)-q(\d)-([abcd])\b',
                 r'\1-q\2-\3',
@@ -151,6 +152,12 @@ class RunnerAgent:
             content = re.sub(
                 r'\b(ch\d\d)-question-(\d)-([abcd])\b',
                 r'\1-q\2-\3',
+                content,
+            )
+            # Bare mcq-qN-option-Z with no chapter prefix → default ch01
+            content = re.sub(
+                r'\bmcq-q(\d)-option-([abcd])\b',
+                r'ch01-q\1-\2',
                 content,
             )
 
@@ -188,48 +195,74 @@ class RunnerAgent:
                 "convert-button":        "ch01-convert-btn",
                 "fraction-convert-btn":  "ch01-convert-btn",
                 # ── math_hub.html CH02 (equation solver) aliases ──
+                # NOTE: LLM uses 'equation-result' for the c INPUT (RHS value),
+                # and 'equation-solution' for the OUTPUT display div.
                 "equation-a":            "ch02-a",
                 "coefficient-a":         "ch02-a",
+                "equation-coefficient":  "ch02-a",  # run 8: exact LLM output
                 "input-a":               "ch02-a",
                 "ch2-a":                 "ch02-a",
                 "equation-b":            "ch02-b",
                 "constant-b":            "ch02-b",
+                "equation-constant":     "ch02-b",  # run 8: exact LLM output
                 "input-b":               "ch02-b",
                 "ch2-b":                 "ch02-b",
                 "equation-c":            "ch02-c",
                 "constant-c":            "ch02-c",
+                "equation-result":       "ch02-c",  # run 8: LLM uses this for c (RHS) input
                 "input-c":               "ch02-c",
                 "ch2-c":                 "ch02-c",
                 "solve-btn":             "ch02-solve-btn",
                 "solve-button":          "ch02-solve-btn",
                 "equation-solve-btn":    "ch02-solve-btn",
                 "ch2-solve-btn":         "ch02-solve-btn",
-                "equation-result":       "ch02-result",
+                "equation-solution":     "ch02-result",  # run 8: LLM uses this for output
                 "solution-result":       "ch02-result",
                 "solver-result":         "ch02-result",
                 "ch2-result":            "ch02-result",
                 # ── math_hub.html CH03 (quadrilateral viewer) aliases ──
                 "properties-display":    "ch03-properties",
                 "property-panel":        "ch03-properties",
+                "properties-panel":      "ch03-properties",  # run 8: exact LLM output
                 "shape-properties":      "ch03-properties",
                 "quadrilateral-properties": "ch03-properties",
                 "ch3-properties":        "ch03-properties",
                 "shape-card-square":     "ch03-card-square",
                 "square-card":           "ch03-card-square",
+                "shape-square":          "ch03-card-square",  # run 8: no "card-" infix
                 "shape-card-rectangle":  "ch03-card-rectangle",
                 "rectangle-card":        "ch03-card-rectangle",
+                "shape-rectangle":       "ch03-card-rectangle",
                 "shape-card-rhombus":    "ch03-card-rhombus",
                 "rhombus-card":          "ch03-card-rhombus",
+                "shape-rhombus":         "ch03-card-rhombus",
                 "shape-card-parallelogram": "ch03-card-parallelogram",
                 "parallelogram-card":    "ch03-card-parallelogram",
+                "shape-parallelogram":   "ch03-card-parallelogram",
                 "shape-card-trapezium":  "ch03-card-trapezium",
                 "trapezium-card":        "ch03-card-trapezium",
+                "shape-trapezium":       "ch03-card-trapezium",
                 # ── math_hub.html CH05 (canvas) aliases ──
                 "data-canvas":           "ch05-canvas",
                 "chart-canvas":          "ch05-canvas",
                 "histogram-canvas":      "ch05-canvas",
                 "graph-canvas":          "ch05-canvas",
+                "geometry-canvas":       "ch05-canvas",  # run 8: exact LLM output
                 "ch5-canvas":            "ch05-canvas",
+                # ── MCQ buttons: bare mcq-qN-option-Z (no chapter prefix) ──
+                # Run 8: LLM uses 'mcq-q1-option-a' (ch01 tests only in plan)
+                "mcq-q1-option-a":   "ch01-q1-a",
+                "mcq-q1-option-b":   "ch01-q1-b",
+                "mcq-q1-option-c":   "ch01-q1-c",
+                "mcq-q1-option-d":   "ch01-q1-d",
+                "mcq-q2-option-a":   "ch01-q2-a",
+                "mcq-q2-option-b":   "ch01-q2-b",
+                "mcq-q2-option-c":   "ch01-q2-c",
+                "mcq-q2-option-d":   "ch01-q2-d",
+                "mcq-q3-option-a":   "ch01-q3-a",
+                "mcq-q3-option-b":   "ch01-q3-b",
+                "mcq-q3-option-c":   "ch01-q3-c",
+                "mcq-q3-option-d":   "ch01-q3-d",
             }
             for wrong, right in testid_aliases.items():
                 for q in ('"', "'"):
