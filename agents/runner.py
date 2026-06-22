@@ -63,6 +63,26 @@ class RunnerAgent:
                 content,
             )
 
+            # Normalise common testid variations the LLM uses inconsistently
+            testid_aliases = {
+                "cart-btn":       "cart-button",
+                "cart-icon":      "cart-button",
+                "cart-toggle":    "cart-button",
+                "open-cart":      "cart-button",
+                "cart-sidebar-total": "cart-total",
+                "sidebar-total":  "cart-total",
+                "total-price":    "cart-total",
+                "add-to-cart-btn": "add-to-cart",
+                "add-cart":       "add-to-cart",
+            }
+            for wrong, right in testid_aliases.items():
+                content = content.replace(f'data-testid="{wrong}"', f'data-testid="{right}"')
+                content = content.replace(f"data-testid='{wrong}'", f"data-testid='{right}'")
+                content = content.replace(f'[data-testid="{wrong}"]', f'[data-testid="{right}"]')
+                content = content.replace(f"[data-testid='{wrong}']", f"[data-testid='{right}']")
+                content = content.replace(f'getByTestId("{wrong}")', f'getByTestId("{right}")')
+                content = content.replace(f"getByTestId('{wrong}')", f"getByTestId('{right}')")
+
             # Fix allure import — must be named import { allure }, not namespace import
             content = re.sub(
                 r"import\s+\*\s+as\s+allure\s+from\s+['\"]allure-(?:js-commons|playwright)['\"]",
