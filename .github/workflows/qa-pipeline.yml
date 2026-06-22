@@ -339,7 +339,7 @@ jobs:
   # ── JOB 4: Scheduled scan — find open qa-ready issues not yet processed ────
   qa-scheduled:
     name: Scheduled QA Scan
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.61.0-jammy
