@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CBSE Class 8 Mathematics Interactive Learning Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f18; --surface: #171923; --card: #1e2233;
+      --border: #2a2f45; --text: #e2e8f0; --muted: #8892a4;
+      --accent: #4f7cff; --accent2: #a855f7; --correct: #22c55e;
+      --wrong: #ef4444; --warn: #f59e0b;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1a2140 0%, #171923 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem; text-align: center;
+      position: sticky; top: 0; z-index: 200;
+    }
+    header h1 { font-size: 1.55rem; font-weight: 800; color: #fff; }
+    header p  { font-size: 0.88rem; color: var(--accent); margin-top: 0.2rem; letter-spacing: 0.03em; }
+
+    /* ── Chapter Nav ── */
+    #chapter-nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0.55rem 1rem; display: flex; flex-wrap: wrap;
+      gap: 0.35rem; justify-content: center;
+      position: sticky; top: 76px; z-index: 199;
+    }
+    #chapter-nav a {
+      display: inline-block; padding: 0.28rem 0.65rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 5px; color: var(--text); text-decoration: none;
+      font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #chapter-nav a:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Chapter Shell ── */
+    .chapter { max-width: 1080px; margin: 2rem auto; padding: 0 1.25rem; }
+    .chapter-header {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px 10px 0 0; padding: 0.85rem 1.4rem;
+      border-bottom: 2px solid var(--accent);
+    }
+    .chapter-header h2 { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+    .chapter-body {
+      background: var(--surface); border: 1px solid var(--border);
+      border-top: none; border-radius: 0 0 10px 10px;
+      padding: 1.25rem; display: grid;
+      grid-template-columns: 1fr 1fr; gap: 1.25rem;
+    }
+    .full { grid-column: 1 / -1; }
+    @media (max-width: 720px) { .chapter-body { grid-template-columns: 1fr; } #chapter-nav { top: 68px; } }
+
+    h3 {
+      font-size: 0.8rem; font-weight: 700; color: var(--warn);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 0.65rem; padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    ul { padding-left: 1.1rem; }
+    li { margin-bottom: 0.25rem; font-size: 0.87rem; color: var(--muted); }
+    li strong { color: var(--text); }
+
+    /* ── Widget ── */
+    .widget {
+      background: #0c0e18; border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem;
+    }
+    .w-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+    .w-row label { font-size: 0.8rem; color: var(--muted); }
+    .widget input[type="number"], .widget input[type="text"], .widget select {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 5px; color: var(--text);
+      padding: 0.4rem 0.6rem; font-size: 0.88rem; width: 88px;
+    }
+    .widget select { width: auto; }
+    .widget input:focus, .widget select:focus { outline: none; border-color: var(--accent); }
+    .widget .sym { color: var(--muted); font-size: 0.95rem; font-weight: 600; }
+    .widget button {
+      background: var(--accent); border: none; border-radius: 5px;
+      color: #fff; padding: 0.4rem 0.9rem; font-size: 0.82rem;
+      font-weight: 700; cursor: pointer; transition: background 0.15s;
+    }
+    .widget button:hover { background: #3d6ae0; }
+    .result-box {
+      background: #080a12; border: 1px solid var(--border);
+      border-radius: 5px; padding: 0.55rem 0.9rem;
+      font-size: 0.92rem; font-weight: 700; color: var(--correct);
+      min-height: 34px; margin-top: 0.5rem;
+    }
+    .result-box.error { color: var(--wrong); }
+
+    /* ── Examples ── */
+    .example {
+      background: #0c0e18; border-left: 3px solid var(--accent2);
+      border-radius: 0 6px 6px 0; padding: 0.7rem 0.9rem;
+      margin-bottom: 0.7rem; font-size: 0.86rem;
+    }
+    .example .st { color: var(--muted); margin-bottom: 0.18rem; }
+    .example .ans { color: var(--correct); font-weight: 700; margin-top: 0.3rem; }
+
+    /* ── MCQ ── */
+    .mcq-q {
+      background: #0c0e18; border: 1px solid var(--border);
+      border-radius: 7px; padding: 0.8rem; margin-bottom: 0.75rem;
+    }
+    .mcq-q p { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.55rem; }
+    .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+    .opt {
+      background: #1a1d2e; border: 1px solid var(--border);
+      border-radius: 5px; color: var(--text); padding: 0.4rem 0.7rem;
+      font-size: 0.81rem; cursor: pointer; text-align: left;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .opt:hover { border-color: var(--accent); }
+    .opt.correct   { background: #14532d; border-color: var(--correct); color: var(--correct); font-weight: 700; }
+    .opt.incorrect { background: #450a0a; border-color: var(--wrong);   color: var(--wrong);   font-weight: 700; }
+
+    /* ── Shape cards (CH03) ── */
+    .shape-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+    .sc {
+      background: var(--card); border: 2px solid var(--border);
+      border-radius: 7px; padding: 0.4rem 0.8rem;
+      cursor: pointer; font-size: 0.8rem; font-weight: 700;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .sc:hover, .sc.active { border-color: var(--accent); background: #1e2a4a; color: #fff; }
+    .props-panel {
+      background: #080a12; border: 1px solid var(--border);
+      border-radius: 6px; padding: 0.7rem; min-height: 78px;
+      font-size: 0.85rem; color: var(--muted);
+    }
+    .props-panel li { color: var(--text); }
+
+    /* ── Construction steps (CH04) ── */
+    .step-item { display: flex; gap: 0.6rem; margin-bottom: 0.55rem; font-size: 0.85rem; }
+    .sn {
+      background: var(--accent); color: #fff; border-radius: 50%;
+      min-width: 22px; height: 22px; display: flex; align-items: center;
+      justify-content: center; font-size: 0.7rem; font-weight: 800; flex-shrink: 0;
+    }
+
+    /* ── Canvas ── */
+    canvas {
+      background: #0c0e18; border: 1px solid var(--border);
+      border-radius: 6px; max-width: 100%; display: block; margin-top: 0.5rem;
+    }
+
+    /* ── Score bar ── */
+    #score-bar {
+      position: fixed; bottom: 1rem; right: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.6rem 1rem;
+      font-size: 0.8rem; color: var(--muted); z-index: 300;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    #score-bar span { color: var(--correct); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<header data-testid="app-header">
+  <h1>CBSE Class 8 Mathematics</h1>
+  <p>Interactive Learning Hub — All 16 Chapters</p>
+</header>
+
+<nav id="chapter-nav" data-testid="chapter-nav">
+  <a href="#ch01" data-testid="nav-ch01">Ch 1: Rational Numbers</a>
+  <a href="#ch02" data-testid="nav-ch02">Ch 2: Linear Equations</a>
+  <a href="#ch03" data-testid="nav-ch03">Ch 3: Quadrilaterals</a>
+  <a href="#ch04" data-testid="nav-ch04">Ch 4: Practical Geometry</a>
+  <a href="#ch05" data-testid="nav-ch05">Ch 5: Data Handling</a>
+  <a href="#ch06" data-testid="nav-ch06">Ch 6: Squares &amp; Roots</a>
+  <a href="#ch07" data-testid="nav-ch07">Ch 7: Cubes &amp; Roots</a>
+  <a href="#ch08" data-testid="nav-ch08">Ch 8: Comparing Quantities</a>
+  <a href="#ch09" data-testid="nav-ch09">Ch 9: Algebraic Expressions</a>
+  <a href="#ch10" data-testid="nav-ch10">Ch 10: Solid Shapes</a>
+  <a href="#ch11" data-testid="nav-ch11">Ch 11: Mensuration</a>
+  <a href="#ch12" data-testid="nav-ch12">Ch 12: Exponents</a>
+  <a href="#ch13" data-testid="nav-ch13">Ch 13: Proportions</a>
+  <a href="#ch14" data-testid="nav-ch14">Ch 14: Factorisation</a>
+  <a href="#ch15" data-testid="nav-ch15">Ch 15: Introduction to Graphs</a>
+  <a href="#ch16" data-testid="nav-ch16">Ch 16: Playing with Numbers</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════ CH01 ═══ -->
+<section class="chapter" id="ch01" data-testid="chapter-1">
+  <div class="chapter-header"><h2>Chapter 1: Rational Numbers</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch01-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Expressed as <strong>p/q</strong> where q ≠ 0; p, q are integers</li>
+        <li>All integers are rational (e.g., 5 = 5/1)</li>
+        <li>Includes terminating and repeating decimals</li>
+        <li>Closed under +, −, ×, ÷ (excluding ÷ by 0)</li>
+        <li>Additive inverse of p/q is −p/q; multiplicative inverse is q/p</li>
+        <li>Rational numbers are dense — infinite rationals between any two</li>
+      </ul>
+    </div>
+    <div data-testid="ch01-demo">
+      <h3>Interactive Demo: Fraction → Decimal</h3>
+      <div class="widget">
+        <div class="w-row">
+          <input type="number" id="p1" data-testid="ch01-numerator" placeholder="p (numerator)"/>
+          <span class="sym">/</span>
+          <input type="number" id="q1" data-testid="ch01-denominator" placeholder="q ≠ 0"/>
+          <button onclick="convertRational()" data-testid="ch01-convert-btn">Convert</button>
+        </div>
+        <div class="result-box" id="ch01-result" data-testid="ch01-result">Enter p and q, then click Convert</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch01-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example 1:</strong> Convert 7/8 to decimal</div>
+        <div class="st">Step 1: 7 ÷ 8 = 0. → 70÷8 = 8 rem 6 → 60÷8 = 7 rem 4 → 40÷8 = 5</div>
+        <div class="ans">∴ 7/8 = 0.875</div>
+      </div>
+      <div class="example">
+        <div class="st"><strong>Example 2:</strong> Add 3/4 + 1/6</div>
+        <div class="st">Step 1: LCM(4,6) = 12 → 9/12 + 2/12 = 11/12</div>
+        <div class="ans">∴ 3/4 + 1/6 = 11/12</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch01-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch01-q1">
+        <p>Q1: Which of the following is NOT a rational number?</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch01-q1-a" onclick="mcq(this,false)">a) 3/4</button>
+          <button class="opt" data-testid="ch01-q1-b" onclick="mcq(this,false)">b) −7/2</button>
+          <button class="opt" data-testid="ch01-q1-c" onclick="mcq(this,true)">c) √2</button>
+          <button class="opt" data-testid="ch01-q1-d" onclick="mcq(this,false)">d) 0</button>
+        </div>
+      </div>
+      <div class="mcq-q" data-testid="ch01-q2">
+        <p>Q2: The decimal form of 1/3 is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch01-q2-a" onclick="mcq(this,false)">a) 0.3</button>
+          <button class="opt" data-testid="ch01-q2-b" onclick="mcq(this,true)">b) 0.333...</button>
+          <button class="opt" data-testid="ch01-q2-c" onclick="mcq(this,false)">c) 0.13</button>
+          <button class="opt" data-testid="ch01-q2-d" onclick="mcq(this,false)">d) 3.0</button>
+        </div>
+      </div>
+      <div class="mcq-q" data-testid="ch01-q3">
+        <p>Q3: Additive inverse of −5/9 is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch01-q3-a" onclick="mcq(this,true)">a) 5/9</button>
+          <button class="opt" data-testid="ch01-q3-b" onclick="mcq(this,false)">b) −5/9</button>
+          <button class="opt" data-testid="ch01-q3-c" onclick="mcq(this,false)">c) 9/5</button>
+          <button class="opt" data-testid="ch01-q3-d" onclick="mcq(this,false)">d) −9/5</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH02 ═══ -->
+<section class="chapter" id="ch02" data-testid="chapter-2">
+  <div class="chapter-header"><h2>Chapter 2: Linear Equations in One Variable</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch02-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Standard form: <strong>ax + b = c</strong> where a ≠ 0</li>
+        <li>Solution: x = (c − b) / a</li>
+        <li>Transposition: move terms across = sign (sign flips)</li>
+        <li>Verification: substitute x to check LHS = RHS</li>
+        <li>Cross-multiplication for equations with fractions</li>
+      </ul>
+    </div>
+    <div data-testid="ch02-demo">
+      <h3>Equation Solver: ax + b = c</h3>
+      <div class="widget">
+        <div class="w-row">
+          <input type="number" id="ea" data-testid="ch02-a" placeholder="a (≠0)"/>
+          <span class="sym">x +</span>
+          <input type="number" id="eb" data-testid="ch02-b" placeholder="b"/>
+          <span class="sym">=</span>
+          <input type="number" id="ec" data-testid="ch02-c" placeholder="c"/>
+          <button onclick="solveEq()" data-testid="ch02-solve-btn">Solve</button>
+        </div>
+        <div class="result-box" id="ch02-result" data-testid="ch02-result">Enter a, b, c then click Solve</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch02-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example 1:</strong> Solve 3x + 7 = 22</div>
+        <div class="st">Step 1: 3x = 22 − 7 = 15</div>
+        <div class="st">Step 2: x = 15 / 3</div>
+        <div class="ans">∴ x = 5 &nbsp;|&nbsp; Verify: 3(5)+7 = 22 ✓</div>
+      </div>
+      <div class="example">
+        <div class="st"><strong>Example 2:</strong> Solve 2x − 4 = x + 3</div>
+        <div class="st">Step 1: 2x − x = 3 + 4 → x = 7</div>
+        <div class="ans">∴ x = 7</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch02-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch02-q1">
+        <p>Q1: Solve 2x + 5 = 13. The value of x is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch02-q1-a" onclick="mcq(this,false)">a) 3</button>
+          <button class="opt" data-testid="ch02-q1-b" onclick="mcq(this,true)">b) 4</button>
+          <button class="opt" data-testid="ch02-q1-c" onclick="mcq(this,false)">c) 5</button>
+          <button class="opt" data-testid="ch02-q1-d" onclick="mcq(this,false)">d) 6</button>
+        </div>
+      </div>
+      <div class="mcq-q" data-testid="ch02-q2">
+        <p>Q2: If 5x − 3 = 2x + 9, then x =</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch02-q2-a" onclick="mcq(this,false)">a) 2</button>
+          <button class="opt" data-testid="ch02-q2-b" onclick="mcq(this,false)">b) 3</button>
+          <button class="opt" data-testid="ch02-q2-c" onclick="mcq(this,true)">c) 4</button>
+          <button class="opt" data-testid="ch02-q2-d" onclick="mcq(this,false)">d) 5</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH03 ═══ -->
+<section class="chapter" id="ch03" data-testid="chapter-3">
+  <div class="chapter-header"><h2>Chapter 3: Understanding Quadrilaterals</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch03-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Sum of interior angles of any quadrilateral = <strong>360°</strong></li>
+        <li>A polygon with 4 sides, 4 vertices, 4 angles, 2 diagonals</li>
+        <li>Exterior angle sum of any convex polygon = 360°</li>
+        <li>Parallelogram: opposite sides parallel &amp; equal</li>
+        <li>Rhombus: all sides equal; Rectangle: all angles 90°</li>
+      </ul>
+    </div>
+    <div data-testid="ch03-demo">
+      <h3>Property Viewer</h3>
+      <div class="widget">
+        <div class="shape-row" data-testid="ch03-shape-cards">
+          <button class="sc" data-testid="ch03-card-square"        onclick="showShape('square',this)">Square</button>
+          <button class="sc" data-testid="ch03-card-rectangle"     onclick="showShape('rectangle',this)">Rectangle</button>
+          <button class="sc" data-testid="ch03-card-rhombus"       onclick="showShape('rhombus',this)">Rhombus</button>
+          <button class="sc" data-testid="ch03-card-parallelogram" onclick="showShape('parallelogram',this)">Parallelogram</button>
+          <button class="sc" data-testid="ch03-card-trapezium"     onclick="showShape('trapezium',this)">Trapezium</button>
+        </div>
+        <div class="props-panel" id="ch03-props" data-testid="ch03-properties">
+          Select a shape above to view its properties.
+        </div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch03-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Three angles of a quadrilateral are 75°, 90°, 110°. Find the fourth.</div>
+        <div class="st">Step 1: Sum = 360°</div>
+        <div class="st">Step 2: Fourth = 360° − (75+90+110) = 360° − 275°</div>
+        <div class="ans">∴ Fourth angle = 85°</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch03-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch03-q1">
+        <p>Q1: Sum of all interior angles of a quadrilateral is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch03-q1-a" onclick="mcq(this,false)">a) 180°</button>
+          <button class="opt" data-testid="ch03-q1-b" onclick="mcq(this,false)">b) 270°</button>
+          <button class="opt" data-testid="ch03-q1-c" onclick="mcq(this,true)">c) 360°</button>
+          <button class="opt" data-testid="ch03-q1-d" onclick="mcq(this,false)">d) 540°</button>
+        </div>
+      </div>
+      <div class="mcq-q" data-testid="ch03-q2">
+        <p>Q2: A rhombus has all sides equal. Its diagonals:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch03-q2-a" onclick="mcq(this,false)">a) Are equal in length</button>
+          <button class="opt" data-testid="ch03-q2-b" onclick="mcq(this,true)">b) Bisect each other at 90°</button>
+          <button class="opt" data-testid="ch03-q2-c" onclick="mcq(this,false)">c) Are parallel</button>
+          <button class="opt" data-testid="ch03-q2-d" onclick="mcq(this,false)">d) Are equal and at 90°</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH04 ═══ -->
+<section class="chapter" id="ch04" data-testid="chapter-4">
+  <div class="chapter-header"><h2>Chapter 4: Practical Geometry</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch04-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>A quadrilateral is uniquely constructed with <strong>5 measurements</strong></li>
+        <li>5 measurements may include sides, diagonals, or angles</li>
+        <li>Special case: square needs only 1 side; rectangle needs 2 sides</li>
+        <li>Diagonal method: divide quadrilateral into 2 triangles (SAS/SSS)</li>
+      </ul>
+    </div>
+    <div data-testid="ch04-demo">
+      <h3>Step-by-Step: Parallelogram ABCD (AB=5cm, AD=3cm, ∠A=60°)</h3>
+      <div class="widget">
+        <div data-testid="ch04-steps">
+          <div class="step-item"><span class="sn">1</span><span>Draw base AB = 5 cm with a ruler.</span></div>
+          <div class="step-item"><span class="sn">2</span><span>At point A, use a protractor to draw ∠DAB = 60°.</span></div>
+          <div class="step-item"><span class="sn">3</span><span>With compass at A, set radius 3 cm. Mark point D on the 60° ray.</span></div>
+          <div class="step-item"><span class="sn">4</span><span>With compass at B (radius = AD = 3 cm), draw an arc.</span></div>
+          <div class="step-item"><span class="sn">5</span><span>With compass at D (radius = AB = 5 cm), draw an arc intersecting step-4 arc. Label intersection C.</span></div>
+          <div class="step-item"><span class="sn">6</span><span>Join BC and DC. ABCD is the required parallelogram.</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch04-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Construct square PQRS with side 4 cm</div>
+        <div class="st">Step 1: Draw PQ = 4 cm</div>
+        <div class="st">Step 2: At P, construct 90°. Mark PS = 4 cm</div>
+        <div class="st">Step 3: At Q, draw arc 4 cm. At S, draw arc 4 cm. Intersection = R</div>
+        <div class="ans">∴ PQRS is the required square (all sides 4 cm, all angles 90°)</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch04-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch04-q1">
+        <p>Q1: Minimum measurements to uniquely construct a quadrilateral:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch04-q1-a" onclick="mcq(this,false)">a) 3</button>
+          <button class="opt" data-testid="ch04-q1-b" onclick="mcq(this,false)">b) 4</button>
+          <button class="opt" data-testid="ch04-q1-c" onclick="mcq(this,true)">c) 5</button>
+          <button class="opt" data-testid="ch04-q1-d" onclick="mcq(this,false)">d) 6</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH05 ═══ -->
+<section class="chapter" id="ch05" data-testid="chapter-5">
+  <div class="chapter-header"><h2>Chapter 5: Data Handling</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch05-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Bar graph: discrete categories with frequency bars</li>
+        <li>Histogram: continuous data grouped into class intervals</li>
+        <li>Pie chart: sector angle = (freq/total) × 360°</li>
+        <li>Probability: P(E) = Favourable / Total outcomes (0 ≤ P ≤ 1)</li>
+      </ul>
+    </div>
+    <div data-testid="ch05-demo">
+      <h3>Chart Renderer (Sample: Favourite Subjects)</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>Type:</label>
+          <select id="chartType" data-testid="ch05-chart-type" onchange="drawChart()">
+            <option value="bar">Bar Graph</option>
+            <option value="histogram">Histogram</option>
+            <option value="pie">Pie Chart</option>
+          </select>
+          <button onclick="drawChart()" data-testid="ch05-draw-btn">Render</button>
+        </div>
+        <canvas id="ch05-canvas" data-testid="ch05-canvas" width="380" height="240"></canvas>
+      </div>
+    </div>
+    <div class="full" data-testid="ch05-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> 30 students chose: Maths 12, Science 8, English 6, History 4</div>
+        <div class="st">Maths sector = (12/30) × 360° = 144°</div>
+        <div class="st">Science sector = (8/30) × 360° = 96°</div>
+        <div class="ans">Each subject occupies its proportional arc in the pie chart</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch05-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch05-q1">
+        <p>Q1: Total of all sector angles in a pie chart equals:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch05-q1-a" onclick="mcq(this,false)">a) 180°</button>
+          <button class="opt" data-testid="ch05-q1-b" onclick="mcq(this,true)">b) 360°</button>
+          <button class="opt" data-testid="ch05-q1-c" onclick="mcq(this,false)">c) 100</button>
+          <button class="opt" data-testid="ch05-q1-d" onclick="mcq(this,false)">d) 270°</button>
+        </div>
+      </div>
+      <div class="mcq-q" data-testid="ch05-q2">
+        <p>Q2: If a coin is tossed, probability of getting Heads is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch05-q2-a" onclick="mcq(this,false)">a) 1</button>
+          <button class="opt" data-testid="ch05-q2-b" onclick="mcq(this,false)">b) 0</button>
+          <button class="opt" data-testid="ch05-q2-c" onclick="mcq(this,true)">c) 1/2</button>
+          <button class="opt" data-testid="ch05-q2-d" onclick="mcq(this,false)">d) 2</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH06 ═══ -->
+<section class="chapter" id="ch06" data-testid="chapter-6">
+  <div class="chapter-header"><h2>Chapter 6: Squares and Square Roots</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch06-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>A perfect square is the product of a number with itself: n² = n × n</li>
+        <li>Numbers ending in 2, 3, 7, 8 are never perfect squares</li>
+        <li>√n by prime factorisation: pair up prime factors</li>
+        <li>Pythagorean triplet: (a, b, c) where a² + b² = c²</li>
+      </ul>
+    </div>
+    <div data-testid="ch06-demo">
+      <h3>Square Root Calculator</h3>
+      <div class="widget">
+        <div class="w-row">
+          <input type="number" id="sqn" data-testid="ch06-input" placeholder="Enter number" min="0"/>
+          <button onclick="calcSqrt()" data-testid="ch06-calc-btn">Find √</button>
+        </div>
+        <div class="result-box" id="ch06-result" data-testid="ch06-result">Enter a number above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch06-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Find √144 by prime factorisation</div>
+        <div class="st">144 = 2×2 × 2×2 × 3×3 → pairs: (2×2) × (2×2) × (3×3) → √144 = 2×2×3</div>
+        <div class="ans">∴ √144 = 12</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch06-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch06-q1">
+        <p>Q1: Which of the following is a perfect square?</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch06-q1-a" onclick="mcq(this,false)">a) 32</button>
+          <button class="opt" data-testid="ch06-q1-b" onclick="mcq(this,true)">b) 49</button>
+          <button class="opt" data-testid="ch06-q1-c" onclick="mcq(this,false)">c) 50</button>
+          <button class="opt" data-testid="ch06-q1-d" onclick="mcq(this,false)">d) 72</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH07 ═══ -->
+<section class="chapter" id="ch07" data-testid="chapter-7">
+  <div class="chapter-header"><h2>Chapter 7: Cubes and Cube Roots</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch07-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Cube of n = n³ = n × n × n</li>
+        <li>Perfect cubes: 1, 8, 27, 64, 125, 216, 343, 512, 729, 1000</li>
+        <li>Cube root by prime factorisation: make triples of prime factors</li>
+        <li>Cube of negative numbers is always negative: (−n)³ = −n³</li>
+      </ul>
+    </div>
+    <div data-testid="ch07-demo">
+      <h3>Cube Root Calculator</h3>
+      <div class="widget">
+        <div class="w-row">
+          <input type="number" id="cbn" data-testid="ch07-input" placeholder="Enter number"/>
+          <button onclick="calcCbrt()" data-testid="ch07-calc-btn">Find ∛</button>
+        </div>
+        <div class="result-box" id="ch07-result" data-testid="ch07-result">Enter a number above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch07-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Find ∛216</div>
+        <div class="st">216 = 2×2×2 × 3×3×3 → triples: (2³) × (3³)</div>
+        <div class="ans">∴ ∛216 = 2 × 3 = 6</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch07-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch07-q1">
+        <p>Q1: The cube root of 1000 is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch07-q1-a" onclick="mcq(this,false)">a) 100</button>
+          <button class="opt" data-testid="ch07-q1-b" onclick="mcq(this,false)">b) 50</button>
+          <button class="opt" data-testid="ch07-q1-c" onclick="mcq(this,true)">c) 10</button>
+          <button class="opt" data-testid="ch07-q1-d" onclick="mcq(this,false)">d) 5</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH08 ═══ -->
+<section class="chapter" id="ch08" data-testid="chapter-8">
+  <div class="chapter-header"><h2>Chapter 8: Comparing Quantities</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch08-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Percentage = (part/whole) × 100</li>
+        <li>Simple Interest: SI = (P × R × T) / 100</li>
+        <li>Compound Interest: A = P(1 + R/100)ⁿ; CI = A − P</li>
+        <li>Profit % = (Profit/CP) × 100; Loss % = (Loss/CP) × 100</li>
+      </ul>
+    </div>
+    <div data-testid="ch08-demo">
+      <h3>Simple Interest Calculator</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>P: ₹</label><input type="number" id="siP" data-testid="ch08-principal" placeholder="Principal"/>
+          <label>R%:</label><input type="number" id="siR" data-testid="ch08-rate" placeholder="Rate"/>
+          <label>T yr:</label><input type="number" id="siT" data-testid="ch08-time" placeholder="Time"/>
+        </div>
+        <button onclick="calcSI()" data-testid="ch08-calc-btn">Calculate SI</button>
+        <div class="result-box" id="ch08-result" data-testid="ch08-result">Enter P, R, T above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch08-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> P = ₹5000, R = 8%, T = 3 years → SI = (5000×8×3)/100</div>
+        <div class="ans">∴ SI = ₹1200; Amount = ₹6200</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch08-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch08-q1">
+        <p>Q1: SI on ₹1000 at 5% per annum for 2 years is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch08-q1-a" onclick="mcq(this,false)">a) ₹50</button>
+          <button class="opt" data-testid="ch08-q1-b" onclick="mcq(this,true)">b) ₹100</button>
+          <button class="opt" data-testid="ch08-q1-c" onclick="mcq(this,false)">c) ₹150</button>
+          <button class="opt" data-testid="ch08-q1-d" onclick="mcq(this,false)">d) ₹200</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH09 ═══ -->
+<section class="chapter" id="ch09" data-testid="chapter-9">
+  <div class="chapter-header"><h2>Chapter 9: Algebraic Expressions and Identities</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch09-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Monomial: 1 term; Binomial: 2 terms; Polynomial: many terms</li>
+        <li>(a+b)² = a² + 2ab + b²</li>
+        <li>(a−b)² = a² − 2ab + b²</li>
+        <li>(a+b)(a−b) = a² − b²</li>
+        <li>Multiplication: distribute each term of one polynomial over other</li>
+      </ul>
+    </div>
+    <div data-testid="ch09-demo">
+      <h3>Identity Verifier: (a+b)²</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>a =</label><input type="number" id="ia" data-testid="ch09-a" placeholder="a"/>
+          <label>b =</label><input type="number" id="ib" data-testid="ch09-b" placeholder="b"/>
+          <button onclick="verifyIdentity()" data-testid="ch09-verify-btn">Verify</button>
+        </div>
+        <div class="result-box" id="ch09-result" data-testid="ch09-result">Enter a and b to verify (a+b)²</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch09-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Expand (3x + 4)²</div>
+        <div class="st">Using (a+b)² = a² + 2ab + b²: a=3x, b=4</div>
+        <div class="st">= (3x)² + 2(3x)(4) + 4² = 9x² + 24x + 16</div>
+        <div class="ans">∴ (3x+4)² = 9x² + 24x + 16</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch09-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch09-q1">
+        <p>Q1: (a + b)² equals:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch09-q1-a" onclick="mcq(this,false)">a) a² + b²</button>
+          <button class="opt" data-testid="ch09-q1-b" onclick="mcq(this,true)">b) a² + 2ab + b²</button>
+          <button class="opt" data-testid="ch09-q1-c" onclick="mcq(this,false)">c) a² − 2ab + b²</button>
+          <button class="opt" data-testid="ch09-q1-d" onclick="mcq(this,false)">d) a² + b² − ab</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH10 ═══ -->
+<section class="chapter" id="ch10" data-testid="chapter-10">
+  <div class="chapter-header"><h2>Chapter 10: Visualising Solid Shapes</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch10-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>3D shapes have Faces (F), Edges (E), Vertices (V)</li>
+        <li>Euler's formula: <strong>F + V − E = 2</strong></li>
+        <li>Cube: 6 faces, 12 edges, 8 vertices → 6+8−12 = 2 ✓</li>
+        <li>Views of 3D shapes: Front, Side (lateral), Top (plan view)</li>
+        <li>Polyhedron: solid with flat polygonal faces</li>
+      </ul>
+    </div>
+    <div data-testid="ch10-demo">
+      <h3>Euler's Formula Checker</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>F:</label><input type="number" id="ef" data-testid="ch10-faces" placeholder="Faces"/>
+          <label>V:</label><input type="number" id="ev" data-testid="ch10-vertices" placeholder="Vertices"/>
+          <label>E:</label><input type="number" id="ee" data-testid="ch10-edges" placeholder="Edges"/>
+          <button onclick="checkEuler()" data-testid="ch10-check-btn">Check</button>
+        </div>
+        <div class="result-box" id="ch10-result" data-testid="ch10-result">Enter F, V, E to verify F+V−E=2</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch10-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Verify Euler's formula for a triangular prism</div>
+        <div class="st">F=5, V=6, E=9 → F+V−E = 5+6−9 = 2</div>
+        <div class="ans">∴ Euler's formula verified ✓</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch10-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch10-q1">
+        <p>Q1: Euler's formula for 3D shapes is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch10-q1-a" onclick="mcq(this,false)">a) F + E = V + 2</button>
+          <button class="opt" data-testid="ch10-q1-b" onclick="mcq(this,true)">b) F + V − E = 2</button>
+          <button class="opt" data-testid="ch10-q1-c" onclick="mcq(this,false)">c) F − V + E = 2</button>
+          <button class="opt" data-testid="ch10-q1-d" onclick="mcq(this,false)">d) F × V = E</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH11 ═══ -->
+<section class="chapter" id="ch11" data-testid="chapter-11">
+  <div class="chapter-header"><h2>Chapter 11: Mensuration</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch11-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Area of trapezium = ½ × (a+b) × h</li>
+        <li>Area of circle = πr²; Circumference = 2πr</li>
+        <li>Volume of cuboid = l × b × h</li>
+        <li>Volume of cylinder = πr²h; Lateral surface area = 2πrh</li>
+        <li>Area of rhombus = ½ × d₁ × d₂</li>
+      </ul>
+    </div>
+    <div data-testid="ch11-demo">
+      <h3>Area Calculator</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>Shape:</label>
+          <select id="aShape" data-testid="ch11-shape-select" onchange="updateAreaForm()">
+            <option value="rect">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="trap">Trapezium</option>
+          </select>
+        </div>
+        <div id="areaInputs" class="w-row">
+          <label>l:</label><input type="number" id="al" data-testid="ch11-dim1" placeholder="length"/>
+          <label>b:</label><input type="number" id="ab" data-testid="ch11-dim2" placeholder="breadth"/>
+        </div>
+        <button onclick="calcArea()" data-testid="ch11-calc-btn">Calculate Area</button>
+        <div class="result-box" id="ch11-result" data-testid="ch11-result">Enter dimensions above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch11-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Find area of trapezium with parallel sides 8 cm, 5 cm and height 4 cm</div>
+        <div class="st">Area = ½ × (8+5) × 4 = ½ × 13 × 4 = 26</div>
+        <div class="ans">∴ Area = 26 cm²</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch11-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch11-q1">
+        <p>Q1: Area of a circle with radius 7 cm is (π = 22/7):</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch11-q1-a" onclick="mcq(this,false)">a) 22 cm²</button>
+          <button class="opt" data-testid="ch11-q1-b" onclick="mcq(this,false)">b) 44 cm²</button>
+          <button class="opt" data-testid="ch11-q1-c" onclick="mcq(this,true)">c) 154 cm²</button>
+          <button class="opt" data-testid="ch11-q1-d" onclick="mcq(this,false)">d) 308 cm²</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH12 ═══ -->
+<section class="chapter" id="ch12" data-testid="chapter-12">
+  <div class="chapter-header"><h2>Chapter 12: Exponents and Powers</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch12-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>aᵐ × aⁿ = aᵐ⁺ⁿ; aᵐ ÷ aⁿ = aᵐ⁻ⁿ</li>
+        <li>(aᵐ)ⁿ = aᵐⁿ; (ab)ⁿ = aⁿbⁿ</li>
+        <li>a⁰ = 1 (a ≠ 0); a⁻ⁿ = 1/aⁿ</li>
+        <li>Standard form: M × 10ⁿ where 1 ≤ M &lt; 10</li>
+      </ul>
+    </div>
+    <div data-testid="ch12-demo">
+      <h3>Exponent Calculator: aⁿ</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>Base (a):</label><input type="number" id="exA" data-testid="ch12-base" placeholder="a"/>
+          <label>Power (n):</label><input type="number" id="exN" data-testid="ch12-power" placeholder="n"/>
+          <button onclick="calcExp()" data-testid="ch12-calc-btn">Calculate</button>
+        </div>
+        <div class="result-box" id="ch12-result" data-testid="ch12-result">Enter base and power above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch12-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Simplify 2³ × 2⁴</div>
+        <div class="st">Using aᵐ × aⁿ = aᵐ⁺ⁿ → 2³⁺⁴ = 2⁷ = 128</div>
+        <div class="ans">∴ 2³ × 2⁴ = 128</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch12-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch12-q1">
+        <p>Q1: The value of 2⁰ is:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch12-q1-a" onclick="mcq(this,false)">a) 0</button>
+          <button class="opt" data-testid="ch12-q1-b" onclick="mcq(this,true)">b) 1</button>
+          <button class="opt" data-testid="ch12-q1-c" onclick="mcq(this,false)">c) 2</button>
+          <button class="opt" data-testid="ch12-q1-d" onclick="mcq(this,false)">d) −1</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH13 ═══ -->
+<section class="chapter" id="ch13" data-testid="chapter-13">
+  <div class="chapter-header"><h2>Chapter 13: Direct and Inverse Proportions</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch13-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Direct proportion: x/y = constant (k); x ↑ ⟹ y ↑</li>
+        <li>Inverse proportion: x × y = constant (k); x ↑ ⟹ y ↓</li>
+        <li>Unitary method: find value of 1 unit, then scale</li>
+      </ul>
+    </div>
+    <div data-testid="ch13-demo">
+      <h3>Proportion Calculator</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>Type:</label>
+          <select id="propType" data-testid="ch13-type" >
+            <option value="direct">Direct</option>
+            <option value="inverse">Inverse</option>
+          </select>
+        </div>
+        <div class="w-row">
+          <label>x₁:</label><input type="number" id="px1" data-testid="ch13-x1" placeholder="x₁"/>
+          <label>y₁:</label><input type="number" id="py1" data-testid="ch13-y1" placeholder="y₁"/>
+          <label>x₂:</label><input type="number" id="px2" data-testid="ch13-x2" placeholder="x₂"/>
+          <button onclick="calcProp()" data-testid="ch13-calc-btn">Find y₂</button>
+        </div>
+        <div class="result-box" id="ch13-result" data-testid="ch13-result">Enter values above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch13-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> 4 workers take 6 days. How many days for 8 workers? (inverse)</div>
+        <div class="st">4 × 6 = 8 × y₂ → y₂ = 24/8</div>
+        <div class="ans">∴ 8 workers take 3 days</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch13-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch13-q1">
+        <p>Q1: If 5 pens cost ₹35, then 8 pens cost (direct proportion):</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch13-q1-a" onclick="mcq(this,false)">a) ₹40</button>
+          <button class="opt" data-testid="ch13-q1-b" onclick="mcq(this,false)">b) ₹48</button>
+          <button class="opt" data-testid="ch13-q1-c" onclick="mcq(this,true)">c) ₹56</button>
+          <button class="opt" data-testid="ch13-q1-d" onclick="mcq(this,false)">d) ₹64</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH14 ═══ -->
+<section class="chapter" id="ch14" data-testid="chapter-14">
+  <div class="chapter-header"><h2>Chapter 14: Factorisation</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch14-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Factorisation: write expression as a product of its factors</li>
+        <li>Common factor method: take HCF as common factor</li>
+        <li>Regrouping: group terms to find common factors</li>
+        <li>Using identities: a²−b² = (a+b)(a−b); (a+b)² = (a+b)(a+b)</li>
+      </ul>
+    </div>
+    <div data-testid="ch14-demo">
+      <h3>Factorisation by Identities</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>Identity:</label>
+          <select id="factId" data-testid="ch14-identity">
+            <option value="diff">a² − b² = (a+b)(a−b)</option>
+            <option value="sq">a² + 2ab + b² = (a+b)²</option>
+          </select>
+        </div>
+        <div class="w-row">
+          <label>a =</label><input type="number" id="fa" data-testid="ch14-a" placeholder="a"/>
+          <label>b =</label><input type="number" id="fb" data-testid="ch14-b" placeholder="b"/>
+          <button onclick="factIdentity()" data-testid="ch14-calc-btn">Factorise</button>
+        </div>
+        <div class="result-box" id="ch14-result" data-testid="ch14-result">Select identity and enter a, b</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch14-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Factorise x² − 9</div>
+        <div class="st">Using a²−b² = (a+b)(a−b): a=x, b=3</div>
+        <div class="ans">∴ x² − 9 = (x+3)(x−3)</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch14-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch14-q1">
+        <p>Q1: Factorise 4x² − 25:</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch14-q1-a" onclick="mcq(this,false)">a) (2x−5)²</button>
+          <button class="opt" data-testid="ch14-q1-b" onclick="mcq(this,true)">b) (2x+5)(2x−5)</button>
+          <button class="opt" data-testid="ch14-q1-c" onclick="mcq(this,false)">c) (4x+5)(x−5)</button>
+          <button class="opt" data-testid="ch14-q1-d" onclick="mcq(this,false)">d) (2x+5)²</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH15 ═══ -->
+<section class="chapter" id="ch15" data-testid="chapter-15">
+  <div class="chapter-header"><h2>Chapter 15: Introduction to Graphs</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch15-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>A point in a plane is located by ordered pair (x, y)</li>
+        <li>X-axis: horizontal; Y-axis: vertical; Origin: (0, 0)</li>
+        <li>Line graph: shows change over time (continuous data)</li>
+        <li>Quadrants: I(+,+) II(−,+) III(−,−) IV(+,−)</li>
+      </ul>
+    </div>
+    <div data-testid="ch15-demo">
+      <h3>Line Graph: Temperature over a Week</h3>
+      <div class="widget">
+        <button onclick="drawLineGraph()" data-testid="ch15-draw-btn">Draw Graph</button>
+        <canvas id="ch15-canvas" data-testid="ch15-canvas" width="380" height="220"></canvas>
+      </div>
+    </div>
+    <div class="full" data-testid="ch15-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Plot point (3, −2)</div>
+        <div class="st">Move 3 units right from origin (positive x), then 2 units down (negative y)</div>
+        <div class="ans">∴ Point (3,−2) lies in Quadrant IV</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch15-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch15-q1">
+        <p>Q1: The point (−3, 4) lies in which quadrant?</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch15-q1-a" onclick="mcq(this,false)">a) Quadrant I</button>
+          <button class="opt" data-testid="ch15-q1-b" onclick="mcq(this,true)">b) Quadrant II</button>
+          <button class="opt" data-testid="ch15-q1-c" onclick="mcq(this,false)">c) Quadrant III</button>
+          <button class="opt" data-testid="ch15-q1-d" onclick="mcq(this,false)">d) Quadrant IV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ CH16 ═══ -->
+<section class="chapter" id="ch16" data-testid="chapter-16">
+  <div class="chapter-header"><h2>Chapter 16: Playing with Numbers</h2></div>
+  <div class="chapter-body">
+    <div data-testid="ch16-concepts">
+      <h3>Key Concepts</h3>
+      <ul>
+        <li>Divisibility by 2: last digit even; By 3: digit sum divisible by 3</li>
+        <li>Divisibility by 9: digit sum divisible by 9</li>
+        <li>Divisibility by 10: last digit is 0</li>
+        <li>Generalised form: 2-digit number ab̄ = 10a + b</li>
+      </ul>
+    </div>
+    <div data-testid="ch16-demo">
+      <h3>Divisibility Checker</h3>
+      <div class="widget">
+        <div class="w-row">
+          <label>Number:</label><input type="number" id="divN" data-testid="ch16-number" placeholder="Enter number"/>
+          <button onclick="checkDivisibility()" data-testid="ch16-check-btn">Check</button>
+        </div>
+        <div class="result-box" id="ch16-result" data-testid="ch16-result">Enter a number above</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch16-examples">
+      <h3>Solved Examples</h3>
+      <div class="example">
+        <div class="st"><strong>Example:</strong> Is 432 divisible by 9?</div>
+        <div class="st">Digit sum = 4+3+2 = 9; 9 ÷ 9 = 1 (remainder 0)</div>
+        <div class="ans">∴ Yes, 432 is divisible by 9</div>
+      </div>
+    </div>
+    <div class="full" data-testid="ch16-mcq">
+      <h3>Practice Questions</h3>
+      <div class="mcq-q" data-testid="ch16-q1">
+        <p>Q1: Which number is divisible by both 2 and 3?</p>
+        <div class="opts">
+          <button class="opt" data-testid="ch16-q1-a" onclick="mcq(this,false)">a) 14</button>
+          <button class="opt" data-testid="ch16-q1-b" onclick="mcq(this,false)">b) 21</button>
+          <button class="opt" data-testid="ch16-q1-c" onclick="mcq(this,true)">c) 18</button>
+          <button class="opt" data-testid="ch16-q1-d" onclick="mcq(this,false)">d) 25</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Score Tracker ── -->
+<div id="score-bar" data-testid="score-bar">
+  Score: <span id="scoreText">0 / 0</span>
+</div>
+
+<script>
+  // ── Score tracking ──
+  let attempted = 0, correct = 0;
+  function updateScore() {
+    document.getElementById('scoreText').textContent = correct + ' / ' + attempted;
+  }
+
+  // ── MCQ engine ──
+  function mcq(btn, isCorrect) {
+    const container = btn.closest('.opts');
+    if (container.querySelector('.correct, .incorrect')) return; // already answered
+    attempted++;
+    if (isCorrect) {
+      btn.classList.add('correct');
+      correct++;
+    } else {
+      btn.classList.add('incorrect');
+      // reveal the correct one
+      container.querySelectorAll('.opt').forEach(b => {
+        if (b.getAttribute('onclick').includes('true')) b.classList.add('correct');
+      });
+    }
+    updateScore();
+  }
+
+  // ── CH01: Fraction → Decimal ──
+  function convertRational() {
+    const p = parseFloat(document.getElementById('p1').value);
+    const q = parseFloat(document.getElementById('q1').value);
+    const el = document.getElementById('ch01-result');
+    if (isNaN(p) || isNaN(q)) { el.textContent = 'Please enter both p and q.'; el.className = 'result-box error'; return; }
+    if (q === 0) { el.textContent = 'Error: q cannot be 0 (undefined).'; el.className = 'result-box error'; return; }
+    const dec = p / q;
+    el.textContent = p + ' / ' + q + ' = ' + parseFloat(dec.toFixed(10));
+    el.className = 'result-box';
+  }
+
+  // ── CH02: Equation Solver ax + b = c ──
+  function solveEq() {
+    const a = parseFloat(document.getElementById('ea').value);
+    const b = parseFloat(document.getElementById('eb').value);
+    const c = parseFloat(document.getElementById('ec').value);
+    const el = document.getElementById('ch02-result');
+    if (isNaN(a) || isNaN(b) || isNaN(c)) { el.textContent = 'Enter all three values.'; el.className = 'result-box error'; return; }
+    if (a === 0) { el.textContent = 'Error: a cannot be 0 (not a linear equation).'; el.className = 'result-box error'; return; }
+    const x = (c - b) / a;
+    el.textContent = 'x = ' + parseFloat(x.toFixed(6));
+    el.className = 'result-box';
+  }
+
+  // ── CH03: Quadrilateral Properties ──
+  const shapeData = {
+    square:        ['All 4 sides equal', 'All angles = 90°', 'Diagonals equal and bisect at 90°', 'Diagonals bisect vertex angles'],
+    rectangle:     ['Opposite sides equal and parallel', 'All angles = 90°', 'Diagonals are equal and bisect each other', 'Each diagonal divides it into 2 congruent triangles'],
+    rhombus:       ['All 4 sides equal', 'Opposite angles equal', 'Diagonals bisect each other at 90°', 'Diagonals bisect the vertex angles'],
+    parallelogram: ['Opposite sides equal and parallel', 'Opposite angles equal', 'Diagonals bisect each other', 'Adjacent angles are supplementary (sum = 180°)'],
+    trapezium:     ['Exactly one pair of parallel sides (bases)', 'Non-parallel sides called legs', 'Sum of co-interior angles = 180°', 'Area = ½ × (sum of parallel sides) × height'],
+  };
+  function showShape(name, btn) {
+    document.querySelectorAll('.sc').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const panel = document.getElementById('ch03-props');
+    panel.innerHTML = '<ul>' + shapeData[name].map(p => '<li>' + p + '</li>').join('') + '</ul>';
+  }
+
+  // ── CH05: Chart Renderer ──
+  function drawChart() {
+    const type = document.getElementById('chartType').value;
+    const canvas = document.getElementById('ch05-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const data  = [12, 8, 6, 4];
+    const labels = ['Maths', 'Science', 'English', 'History'];
+    const colors = ['#4f7cff', '#a855f7', '#22c55e', '#f59e0b'];
+    const total  = data.reduce((s, v) => s + v, 0);
+
+    if (type === 'bar' || type === 'histogram') {
+      const pad = 40, bw = (W - pad*2) / data.length - 8;
+      const maxV = Math.max(...data);
+      ctx.fillStyle = '#8892a4'; ctx.font = '11px system-ui';
+      data.forEach((v, i) => {
+        const x = pad + i * ((W - pad*2) / data.length);
+        const h = (v / maxV) * (H - 60);
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(x, H - 30 - h, bw, h);
+        ctx.fillStyle = '#e2e8f0'; ctx.textAlign = 'center';
+        ctx.fillText(labels[i], x + bw/2, H - 14);
+        ctx.fillText(v, x + bw/2, H - 34 - h);
+      });
+    } else if (type === 'pie') {
+      const cx = W/2, cy = H/2, r = Math.min(W, H)/2 - 20;
+      let start = -Math.PI/2;
+      data.forEach((v, i) => {
+        const angle = (v / total) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, start, start + angle);
+        ctx.closePath(); ctx.fillStyle = colors[i]; ctx.fill();
+        const mid = start + angle/2;
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText(labels[i], cx + (r*0.65)*Math.cos(mid), cy + (r*0.65)*Math.sin(mid));
+        start += angle;
+      });
+    }
+  }
+
+  // ── CH06: Square Root ──
+  function calcSqrt() {
+    const n = parseFloat(document.getElementById('sqn').value);
+    const el = document.getElementById('ch06-result');
+    if (isNaN(n) || n < 0) { el.textContent = 'Enter a non-negative number.'; el.className = 'result-box error'; return; }
+    const r = Math.sqrt(n);
+    const isPerfect = Number.isInteger(r);
+    el.textContent = '√' + n + ' = ' + (isPerfect ? r : r.toFixed(6) + ' (not a perfect square)');
+    el.className = 'result-box';
+  }
+
+  // ── CH07: Cube Root ──
+  function calcCbrt() {
+    const n = parseFloat(document.getElementById('cbn').value);
+    const el = document.getElementById('ch07-result');
+    if (isNaN(n)) { el.textContent = 'Enter a number.'; el.className = 'result-box error'; return; }
+    const r = Math.cbrt(n);
+    const isPerfect = Number.isInteger(r);
+    el.textContent = '∛' + n + ' = ' + (isPerfect ? r : r.toFixed(6));
+    el.className = 'result-box';
+  }
+
+  // ── CH08: Simple Interest ──
+  function calcSI() {
+    const P = parseFloat(document.getElementById('siP').value);
+    const R = parseFloat(document.getElementById('siR').value);
+    const T = parseFloat(document.getElementById('siT').value);
+    const el = document.getElementById('ch08-result');
+    if (isNaN(P) || isNaN(R) || isNaN(T)) { el.textContent = 'Enter P, R and T.'; el.className = 'result-box error'; return; }
+    const SI = (P * R * T) / 100;
+    el.textContent = 'SI = ₹' + SI.toFixed(2) + '  |  Amount = ₹' + (P + SI).toFixed(2);
+    el.className = 'result-box';
+  }
+
+  // ── CH09: Identity Verifier ──
+  function verifyIdentity() {
+    const a = parseFloat(document.getElementById('ia').value);
+    const b = parseFloat(document.getElementById('ib').value);
+    const el = document.getElementById('ch09-result');
+    if (isNaN(a) || isNaN(b)) { el.textContent = 'Enter a and b.'; el.className = 'result-box error'; return; }
+    const lhs = Math.pow(a + b, 2);
+    const rhs = a*a + 2*a*b + b*b;
+    el.textContent = '('+a+'+'+b+')² = '+lhs+' | a²+2ab+b² = '+rhs+' → '+( lhs===rhs ? 'Identity verified ✓' : 'Mismatch!');
+    el.className = 'result-box';
+  }
+
+  // ── CH10: Euler's Formula ──
+  function checkEuler() {
+    const F = parseInt(document.getElementById('ef').value);
+    const V = parseInt(document.getElementById('ev').value);
+    const E = parseInt(document.getElementById('ee').value);
+    const el = document.getElementById('ch10-result');
+    if (isNaN(F)||isNaN(V)||isNaN(E)) { el.textContent = 'Enter F, V and E.'; el.className = 'result-box error'; return; }
+    const result = F + V - E;
+    el.textContent = 'F+V−E = '+F+'+'+V+'−'+E+' = '+result+(result===2 ? ' = 2 ✓ Valid polyhedron' : ' ≠ 2 ✗ Not a valid polyhedron');
+    el.className = result === 2 ? 'result-box' : 'result-box error';
+  }
+
+  // ── CH11: Area Calculator ──
+  function updateAreaForm() {
+    const s = document.getElementById('aShape').value;
+    const c = document.getElementById('areaInputs');
+    if (s === 'rect')   c.innerHTML = '<label>l:</label><input type="number" id="al" data-testid="ch11-dim1" placeholder="length"/><label>b:</label><input type="number" id="ab" data-testid="ch11-dim2" placeholder="breadth"/>';
+    if (s === 'circle') c.innerHTML = '<label>r:</label><input type="number" id="al" data-testid="ch11-dim1" placeholder="radius"/>';
+    if (s === 'trap')   c.innerHTML = '<label>a:</label><input type="number" id="al" data-testid="ch11-dim1" placeholder="side a"/><label>b:</label><input type="number" id="ab" data-testid="ch11-dim2" placeholder="side b"/><label>h:</label><input type="number" id="ah" data-testid="ch11-dim3" placeholder="height"/>';
+  }
+  function calcArea() {
+    const s = document.getElementById('aShape').value;
+    const el = document.getElementById('ch11-result');
+    if (s === 'rect') {
+      const l = parseFloat(document.getElementById('al').value), b = parseFloat(document.getElementById('ab').value);
+      if (isNaN(l)||isNaN(b)) { el.textContent = 'Enter l and b.'; el.className='result-box error'; return; }
+      el.textContent = 'Area = '+l+' × '+b+' = '+(l*b)+' sq units'; el.className='result-box';
+    } else if (s === 'circle') {
+      const r = parseFloat(document.getElementById('al').value);
+      if (isNaN(r)) { el.textContent = 'Enter radius.'; el.className='result-box error'; return; }
+      el.textContent = 'Area = π×'+r+'² = '+(Math.PI*r*r).toFixed(4)+' sq units'; el.className='result-box';
+    } else {
+      const a = parseFloat(document.getElementById('al').value), b = parseFloat(document.getElementById('ab').value), h = parseFloat(document.getElementById('ah').value);
+      if (isNaN(a)||isNaN(b)||isNaN(h)) { el.textContent = 'Enter a, b, h.'; el.className='result-box error'; return; }
+      el.textContent = 'Area = ½×('+(a+b)+')×'+h+' = '+(0.5*(a+b)*h)+' sq units'; el.className='result-box';
+    }
+  }
+
+  // ── CH12: Exponent ──
+  function calcExp() {
+    const a = parseFloat(document.getElementById('exA').value);
+    const n = parseFloat(document.getElementById('exN').value);
+    const el = document.getElementById('ch12-result');
+    if (isNaN(a)||isNaN(n)) { el.textContent = 'Enter base and power.'; el.className='result-box error'; return; }
+    el.textContent = a + '^' + n + ' = ' + Math.pow(a, n);
+    el.className = 'result-box';
+  }
+
+  // ── CH13: Proportion ──
+  function calcProp() {
+    const type = document.getElementById('propType').value;
+    const x1 = parseFloat(document.getElementById('px1').value);
+    const y1 = parseFloat(document.getElementById('py1').value);
+    const x2 = parseFloat(document.getElementById('px2').value);
+    const el  = document.getElementById('ch13-result');
+    if (isNaN(x1)||isNaN(y1)||isNaN(x2)) { el.textContent = 'Enter x₁, y₁ and x₂.'; el.className='result-box error'; return; }
+    let y2;
+    if (type === 'direct')  y2 = (y1 / x1) * x2;
+    else                    y2 = (x1 * y1) / x2;
+    el.textContent = 'y₂ = ' + parseFloat(y2.toFixed(6)) + ' (' + type + ' proportion)';
+    el.className = 'result-box';
+  }
+
+  // ── CH14: Factorisation ──
+  function factIdentity() {
+    const id = document.getElementById('factId').value;
+    const a = parseFloat(document.getElementById('fa').value);
+    const b = parseFloat(document.getElementById('fb').value);
+    const el = document.getElementById('ch14-result');
+    if (isNaN(a)||isNaN(b)) { el.textContent = 'Enter a and b.'; el.className='result-box error'; return; }
+    if (id === 'diff') el.textContent = a+'²−'+b+'² = ('+a+'+'+b+')('+a+'−'+b+') = '+(a*a-b*b);
+    else               el.textContent = a+'²+2·'+a+'·'+b+'+'+b+'² = ('+a+'+'+b+')² = '+Math.pow(a+b,2);
+    el.className = 'result-box';
+  }
+
+  // ── CH15: Line Graph ──
+  function drawLineGraph() {
+    const canvas = document.getElementById('ch15-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const days  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const temps = [28, 30, 27, 32, 31, 29, 26];
+    const pad = 40, usableW = W - pad*2, usableH = H - pad*2;
+    const minT = 24, maxT = 34;
+    ctx.strokeStyle = '#2a2f45'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) {
+      const y = pad + (i/5)*usableH;
+      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W-pad, y); ctx.stroke();
+      ctx.fillStyle='#8892a4'; ctx.font='10px system-ui'; ctx.textAlign='right';
+      ctx.fillText(maxT - i*2, pad-4, y+4);
+    }
+    const pts = temps.map((t,i) => ({ x: pad + (i/(days.length-1))*usableW, y: pad + ((maxT-t)/(maxT-minT))*usableH }));
+    ctx.strokeStyle = '#4f7cff'; ctx.lineWidth = 2;
+    ctx.beginPath(); pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y)); ctx.stroke();
+    pts.forEach((p,i) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fillStyle='#4f7cff'; ctx.fill();
+      ctx.fillStyle='#e2e8f0'; ctx.font='10px system-ui'; ctx.textAlign='center';
+      ctx.fillText(days[i], p.x, H-pad+14);
+      ctx.fillText(temps[i]+'°', p.x, p.y-8);
+    });
+  }
+
+  // ── CH16: Divisibility ──
+  function checkDivisibility() {
+    const n = parseInt(document.getElementById('divN').value);
+    const el = document.getElementById('ch16-result');
+    if (isNaN(n)) { el.textContent = 'Enter a valid integer.'; el.className='result-box error'; return; }
+    const rules = [2,3,5,9,10];
+    const results = rules.filter(d => n % d === 0);
+    el.textContent = n + ' is divisible by: ' + (results.length ? results.join(', ') : 'none of 2,3,5,9,10');
+    el.className = 'result-box';
+  }
+
+  // ── Auto-draw chart and line graph on load ──
+  window.addEventListener('load', () => { drawChart(); drawLineGraph(); });
+</script>
+</body>
+</html>

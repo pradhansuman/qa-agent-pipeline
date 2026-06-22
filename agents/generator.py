@@ -87,9 +87,73 @@ Return ONLY JSON matching this shape — no markdown:
             f"  expected: {s.expected}"
             for s in plan.scenarios
         )
-        # For the ShopNow demo store, inject exact testid map so the LLM doesn't guess
+        # For each app, inject the exact testid map so the LLM doesn't guess selectors
         store_hint = ""
-        if "pradhansuman.github.io" in target_url or "store.html" in target_url:
+        math_hub_hint = ""
+
+        if "math_hub" in target_url or ("pradhansuman.github.io" in target_url and "math" in target_url):
+            math_hub_hint = (
+                "\nThis is the CBSE Class 8 Mathematics Interactive Learning Hub.\n"
+                "Known data-testid attributes (use EXACTLY these — no variations):\n\n"
+                "NAVIGATION:\n"
+                "  [data-testid=\"chapter-nav\"]          — sticky nav bar containing all chapter links\n"
+                "  [data-testid=\"nav-ch01\"] through [data-testid=\"nav-ch16\"] — anchor links\n"
+                "  Clicking nav-chXX smooth-scrolls to the section with id=\"chXX\".\n"
+                "  After clicking nav-ch03, verify the ch03 section is in viewport:\n"
+                "    await page.locator('[data-testid=\"nav-ch03\"]').click();\n"
+                "    await page.waitForFunction(() => {\n"
+                "      const el = document.getElementById('ch03');\n"
+                "      if (!el) return false;\n"
+                "      const r = el.getBoundingClientRect();\n"
+                "      return r.top >= -50 && r.top <= window.innerHeight;\n"
+                "    });\n\n"
+                "CHAPTER SECTIONS: [data-testid=\"chapter-1\"] through [data-testid=\"chapter-16\"]\n\n"
+                "CH01 — Rational Numbers / Fraction→Decimal converter:\n"
+                "  [data-testid=\"ch01-numerator\"]      — number input for p (numerator)\n"
+                "  [data-testid=\"ch01-denominator\"]    — number input for q (denominator, must ≠ 0)\n"
+                "  [data-testid=\"ch01-convert-btn\"]    — 'Convert' button\n"
+                "  [data-testid=\"ch01-result\"]         — result div; shows 'p / q = decimal'\n"
+                "    Example: fill p=7, q=8 → click Convert → result contains '0.875'\n"
+                "    IMPORTANT: p/q decimal is computed with JavaScript Number division.\n"
+                "    7/8 = 0.875 exactly. Use expect(text).toContain('0.875').\n\n"
+                "CH02 — Linear Equations (ax + b = c):\n"
+                "  [data-testid=\"ch02-a\"]              — number input for a (coefficient, must ≠ 0)\n"
+                "  [data-testid=\"ch02-b\"]              — number input for b (constant)\n"
+                "  [data-testid=\"ch02-c\"]              — number input for c (RHS)\n"
+                "  [data-testid=\"ch02-solve-btn\"]      — 'Solve' button\n"
+                "  [data-testid=\"ch02-result\"]         — result div; shows 'x = <value>'\n"
+                "    Example: a=3, b=7, c=22 → x = (22-7)/3 = 5 → result contains 'x = 5'\n\n"
+                "CH03 — Quadrilaterals:\n"
+                "  [data-testid=\"ch03-card-square\"], [data-testid=\"ch03-card-rectangle\"],\n"
+                "  [data-testid=\"ch03-card-rhombus\"], [data-testid=\"ch03-card-parallelogram\"],\n"
+                "  [data-testid=\"ch03-card-trapezium\"]  — shape selector buttons\n"
+                "  [data-testid=\"ch03-properties\"]     — panel showing bullet-list of properties\n"
+                "    After clicking ch03-card-square, the panel shows 'All 4 sides equal'\n\n"
+                "CH05 — Data Handling:\n"
+                "  [data-testid=\"ch05-chart-type\"]     — <select>: 'bar', 'histogram', 'pie'\n"
+                "  [data-testid=\"ch05-draw-btn\"]       — 'Render' button\n"
+                "  [data-testid=\"ch05-canvas\"]         — HTML5 <canvas> (width=380, height=240)\n"
+                "    Canvas is pre-drawn on page load. Assert non-zero dimensions:\n"
+                "      const canvas = page.locator('[data-testid=\"ch05-canvas\"]');\n"
+                "      expect(await canvas.evaluate(el => el.width)).toBeGreaterThan(0);\n"
+                "      expect(await canvas.evaluate(el => el.height)).toBeGreaterThan(0);\n\n"
+                "MCQ BUTTONS (pattern: [data-testid=\"chXX-qY-Z\"] where Z is a/b/c/d):\n"
+                "  Example: [data-testid=\"ch01-q1-c\"] — Chapter 1, Question 1, option C\n"
+                "  Clicking the WRONG option adds class 'incorrect' to that button.\n"
+                "  Clicking the RIGHT option adds class 'correct' to that button.\n"
+                "  Once answered, clicking again has no effect (guard prevents re-answering).\n"
+                "  To assert wrong answer turns red:\n"
+                "    await page.locator('[data-testid=\"ch01-q1-a\"]').click(); // option a is wrong for Q1\n"
+                "    await expect(page.locator('[data-testid=\"ch01-q1-a\"]')).toHaveClass(/incorrect/);\n\n"
+                "SCORE BAR: [data-testid=\"score-bar\"] — fixed bottom-right showing 'Score: X / Y'\n\n"
+                "TEST ISOLATION: each Playwright test gets a fresh browser context. No cleanup needed.\n"
+                "NAVIGATION NOTE: always call page.goto() with the FULL absolute URL.\n"
+                "  Then scroll to the chapter being tested before interacting with its widgets:\n"
+                "    await page.locator('[data-testid=\"nav-ch01\"]').click();\n"
+                "    await page.locator('[data-testid=\"ch01-numerator\"]').scrollIntoViewIfNeeded();\n"
+            )
+
+        if "pradhansuman.github.io" in target_url or ("store.html" in target_url and "math" not in target_url):
             store_hint = (
                 "\nKnown data-testid attributes for this app (use EXACTLY these, no variations):\n"
                 "  [data-testid=\"cart-button\"]         — header button that opens/closes cart sidebar\n"
@@ -149,11 +213,12 @@ Return ONLY JSON matching this shape — no markdown:
                 "    expect(alertTotal).toBeCloseTo(sidebarTotal, 2);\n"
             )
 
+        app_hint = math_hub_hint or store_hint
         prompt = (
             f"Issue #{plan.issue_number}\n"
             f"Plan summary: {plan.summary}\n"
             f"Risk: {plan.risk_level.value} — {plan.risk_rationale}\n"
-            f"{url_note}{store_hint}\n\n"
+            f"{url_note}{app_hint}\n\n"
             f"Scenarios to implement:\n{scenarios}\n"
         )
         suite = self._complete_json(prompt, GeneratedSuite, max_tokens=8000)
