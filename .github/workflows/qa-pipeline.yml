@@ -74,10 +74,30 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const body = context.payload.issue.body || '';
-            const match = body.match(/(?:app url|test url|url)\s*:\s*(https?:\/\/\S+)/i);
+            // Resolve issue number — works for both issues event and workflow_dispatch
+            const issueNum = context.issue.number
+              || parseInt(context.payload.inputs?.issue_number || '0');
+
+            // For workflow_dispatch the issue payload is absent; fetch via API
+            let issueBody = context.payload.issue?.body || '';
+            if (!issueBody && issueNum) {
+              try {
+                const { data } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  issue_number: issueNum,
+                });
+                issueBody = data.body || '';
+              } catch (e) {
+                console.log('Could not fetch issue body:', e.message);
+              }
+            }
+
+            const match = issueBody.match(/(?:app url|test url|url)\s*:\s*(https?:\/\/\S+)/i);
             const url = match ? match[1].trim() : '';
             core.setOutput('app_url', url);
+            core.setOutput('issue_number', String(issueNum));
+            console.log('Issue number :', issueNum);
             console.log('Detected app URL:', url || 'not found — will use DemoQA');
 
       - name: Run QA pipeline
@@ -88,7 +108,7 @@ jobs:
           QA_TARGET_URL: ${{ steps.extract_url.outputs.app_url }}
         run: |
           # Run real pipeline — capture stdout+stderr; save exit code via PIPESTATUS
-          ISSUE_NUM="${{ github.event.issue.number || inputs.issue_number }}"
+          ISSUE_NUM="${{ steps.extract_url.outputs.issue_number }}"
           python3 -m orchestrator.pipeline \
             "${{ github.repository }}" \
             "$ISSUE_NUM" \
@@ -131,12 +151,14 @@ jobs:
               ? `🌐 **Tested against:** ${appUrl}`
               : `⚠️ **Tested against:** [DemoQA](https://demoqa.com) (no URL found in issue body)\n`
                 + `> Add \`App URL: https://your-app-url\` to the issue description to test your real app.`;
+            const issueNum = parseInt('${{ steps.extract_url.outputs.issue_number }}') || 0;
+            if (!issueNum) { console.log('No issue number — skipping comment'); return; }
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: issueNum,
               owner:        context.repo.owner,
               repo:         context.repo.repo,
               body: `### ${icon} AI QA Pipeline Result\n\`\`\`\n${body}\n\`\`\`\n\n${urlNote}\n\n`
-                + `_Triggered on issue #${{ github.event.issue.number || inputs.issue_number }}_`
+                + `_Triggered on issue #${issueNum}_`
             });
 
       - name: Add pass/fail label to issue
@@ -144,10 +166,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const issueNum = parseInt('${{ steps.extract_url.outputs.issue_number }}') || 0;
+            if (!issueNum) { console.log('No issue number — skipping label'); return; }
             const gate  = '${{ steps.qa.outputs.gate }}';
             const label = gate === 'pass' ? 'qa-passed' : 'qa-failed';
             github.rest.issues.addLabels({
-              issue_number: context.issue.number,
+              issue_number: issueNum,
               owner:        context.repo.owner,
               repo:         context.repo.repo,
               labels:       [label]
@@ -156,6 +180,14 @@ jobs:
       - name: Enforce gate on failure
         if: steps.qa.outputs.gate == 'fail'
         run: echo "::error::QA gate FAILED — P0 failure or pass rate < 90%" && exit 1
+
+      - name: Upload pipeline output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-output-${{ github.run_id }}
+          path: pipeline_output.txt
+          retention-days: 7
 
 
   # ── JOB 2: Pull Request opened or updated ─────────────────────────────────
