@@ -118,9 +118,8 @@ class RunnerAgent:
                     content = content.replace(f'[data-testid={q}{wrong}{q}]', f'[data-testid="{right}"]')
                     content = content.replace(f'getByTestId({q}{wrong}{q})', f'getByTestId("{right}")')
 
-            # Fix math_hub selector drift: LLM uppercases "ch" → "CH" or keeps
-            # "chapter-CHxx" format instead of "chapter-N" (numeric).
-            # nav-CH05 → nav-ch05 ; nav-CH5 → nav-ch05
+            # Fix math_hub selector drift: LLM uses wrong nav/section selectors.
+            # nav-CH05 → nav-ch05 ; nav-chapter-5 → nav-ch05 ; etc.
             def _fix_nav_ch(m: re.Match) -> str:
                 n = int(m.group(1))
                 return f'[data-testid="nav-ch{n:02d}"]'
@@ -150,6 +149,22 @@ class RunnerAgent:
             content = re.sub(
                 r'getByTestId\(["\']chapter-[Cc][Hh]-?(\d+)["\']\)',
                 _fix_ch_section_gbt, content,
+            )
+
+            # nav-chapter-N → nav-ch0N (LLM sometimes writes "nav-chapter-5" instead of "nav-ch05")
+            def _fix_nav_chapter(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'[data-testid="nav-ch{n:02d}"]'
+            content = re.sub(
+                r'\[data-testid=["\']nav-chapter-(\d+)["\']\]',
+                _fix_nav_chapter, content,
+            )
+            def _fix_nav_chapter_gbt(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'getByTestId("nav-ch{n:02d}")'
+            content = re.sub(
+                r'getByTestId\(["\']nav-chapter-(\d+)["\']\)',
+                _fix_nav_chapter_gbt, content,
             )
 
             # Fix "click card then click add-to-cart globally" anti-pattern.
