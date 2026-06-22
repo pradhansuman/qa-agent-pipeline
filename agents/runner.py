@@ -238,6 +238,30 @@ class RunnerAgent:
                 _fix_nav_chapter_gbt, content,
             )
 
+            # Fix: LLM text-based nav — hasText: /chapter\s*N/i → testid nav-chNN
+            # Matches: page.locator('a, button').filter({ hasText: /chapter\s*5/i }).first()
+            # or similar patterns with varying spacing/quotes
+            def _fix_hastext_chapter_nav(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'page.locator(\'[data-testid="nav-ch{n:02d}"]\')'
+            content = re.sub(
+                r"page\.locator\(['\"]a[^'\"]*['\"]\)\.filter\(\{[^}]*hasText\s*:\s*/chapter\s*(\d+)/i[^}]*\}\)\.first\(\)",
+                _fix_hastext_chapter_nav, content,
+            )
+            content = re.sub(
+                r"page\.locator\(['\"]a[^'\"]*['\"]\)\.filter\(\{[^}]*hasText\s*:\s*/chapter\s+(\d+)/i[^}]*\}\)\.first\(\)",
+                _fix_hastext_chapter_nav, content,
+            )
+
+            # Fix: LLM uses .getByText('Chapter N') or .getByText(/Chapter\s*N/i) for nav
+            def _fix_getbytext_chapter(m: re.Match) -> str:
+                n = int(m.group(1))
+                return f'page.locator(\'[data-testid="nav-ch{n:02d}"]\')'
+            content = re.sub(
+                r"page\.getByText\(['\"/]Chapter\s*(\d+)['\"/]\w*\)",
+                _fix_getbytext_chapter, content,
+            )
+
             # Fix "click card then click add-to-cart globally" anti-pattern.
             # LLM sometimes generates:
             #   await cards[i].click();            <- clicking the card has no handler
