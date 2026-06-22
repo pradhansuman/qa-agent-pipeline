@@ -109,6 +109,85 @@ class GeneratedSuite(BaseModel):
     notes: Optional[str] = None
 
 
+# ─────────────── stage 2 (alt) — SDET Agent ───────────────
+class SDETTestCase(BaseModel):
+    """One atomic test case derived by a formal test-design technique."""
+    id: str                  # TC-001
+    title: str
+    requirement_ref: str     # AC-1, AC-2, …
+    type: str                # positive|negative|boundary|security|state|concurrency|…
+    technique: str           # Equivalence Partitioning | Boundary Value Analysis | …
+    priority: str            # P0–P3
+    risk_rationale: str
+    preconditions: list[str] = Field(default_factory=list)
+    test_data: dict          = Field(default_factory=dict)
+    steps: list[str]         = Field(default_factory=list)
+    expected_result: str
+
+
+class CoverageGap(BaseModel):
+    requirement_ref: str
+    reason: str
+
+
+class SDETTestPlan(BaseModel):
+    """OUTPUT of the SDETAgent — richer than TestPlan; includes technique attribution,
+    concrete test_data, and a coverage-gap manifest."""
+    issue_number: int
+    test_cases: list[SDETTestCase]
+    coverage_gaps: list[CoverageGap] = Field(default_factory=list)
+
+    def to_test_plan(self) -> "TestPlan":
+        """Downcast to the standard TestPlan so the downstream Generator is unchanged."""
+        _type_map = {
+            "positive": TestType.E2E, "negative": TestType.E2E,
+            "boundary": TestType.E2E, "security": TestType.E2E,
+            "state": TestType.E2E,    "concurrency": TestType.INTEG,
+            "api": TestType.API,      "integ": TestType.INTEG,
+            "idempotency": TestType.INTEG, "accessibility": TestType.E2E,
+            "localization": TestType.E2E,  "observability": TestType.INTEG,
+        }
+        _pri_map = {
+            "P0": Priority.P0, "P1": Priority.P1,
+            "P2": Priority.P2, "P3": Priority.P2,  # P3 → P2, no P3 in enum
+        }
+
+        scenarios: list["TestScenario"] = []
+        for tc in self.test_cases:
+            desc = f"[{tc.technique}] {tc.title}. Risk: {tc.risk_rationale}"
+            scenarios.append(TestScenario(
+                id=tc.id,
+                name=tc.title,
+                type=_type_map.get(tc.type.split("/")[0].lower(), TestType.E2E),
+                priority=_pri_map.get(tc.priority, Priority.P2),
+                description=desc,
+                steps=tc.steps or [f"Test data: {tc.test_data}"],
+                expected=tc.expected_result,
+            ))
+
+        priorities = {tc.priority for tc in self.test_cases}
+        risk = (RiskLevel.HIGH if "P0" in priorities
+                else RiskLevel.MEDIUM if "P1" in priorities
+                else RiskLevel.LOW)
+
+        techniques = sorted({tc.technique for tc in self.test_cases})
+        types      = sorted({tc.type      for tc in self.test_cases})
+        return TestPlan(
+            issue_number=self.issue_number,
+            summary=(
+                f"SDET-derived plan: {len(self.test_cases)} cases via "
+                f"{', '.join(techniques[:3])}{'…' if len(techniques) > 3 else ''}"
+            ),
+            scenarios=scenarios,
+            coverage_areas=list(dict.fromkeys(types)),  # order-preserving dedup
+            risk_level=risk,
+            risk_rationale=(
+                f"{len([t for t in self.test_cases if t.priority=='P0'])} P0 cases; "
+                f"{len(self.coverage_gaps)} coverage gap(s) noted by SDET agent"
+            ),
+        )
+
+
 # ─────────────── stage 3.5 — Reviewer Agent ───────────────
 class DimensionScores(BaseModel):
     """Per-dimension quality scores, each 1 (poor) – 5 (excellent)."""

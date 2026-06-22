@@ -41,10 +41,11 @@ from anthropic import Anthropic
 
 from contracts.schemas import (
     IssueRef, IssuePayload, TestPlan, GeneratedSuite, RunResults, ReportArtifact,
-    HealingAttempt, ReviewReport,
+    HealingAttempt, ReviewReport, SDETTestPlan,
 )
 from agents.ingestor import IngestorAgent
 from agents.planner import PlannerAgent
+from agents.sdet import SDETAgent
 from agents.generator import GeneratorAgent
 from agents.reviewer import ReviewerAgent
 from agents.runner import RunnerAgent
@@ -55,18 +56,19 @@ from agents.reporter import ReporterAgent
 @dataclass
 class PipelineTrace:
     """Every intermediate artifact, kept for audit / debugging / CI logs."""
-    payload: IssuePayload
-    plan: TestPlan
-    suite: GeneratedSuite
-    review: Optional[ReviewReport]
-    results: RunResults
-    report: ReportArtifact
+    payload:    IssuePayload
+    plan:       TestPlan           # always present (may be downcast from sdet_plan)
+    sdet_plan:  Optional[SDETTestPlan]  # present only when --sdet was used
+    suite:      GeneratedSuite
+    review:     Optional[ReviewReport]
+    results:    RunResults
+    report:     ReportArtifact
     healing_log: list[HealingAttempt] = field(default_factory=list)
 
 
 class QAPipeline:
     def __init__(self, real_run: bool = False, client: Anthropic | None = None,
-                 self_heal: bool = True, review: bool = True,
+                 self_heal: bool = True, review: bool = True, sdet: bool = False,
                  demo: bool = False, offline: bool = False):
         # in demo mode we don't need a real key — use a dummy client so the
         # SDK constructs, then stubs replace every call before it's used.
@@ -75,13 +77,14 @@ class QAPipeline:
                 client = Anthropic(api_key="demo-no-key-needed")
             else:
                 client = Anthropic()
-        self.ingestor  = IngestorAgent()
-        self.planner   = PlannerAgent(client=client)
-        self.generator = GeneratorAgent(client=client)
-        self.reviewer  = ReviewerAgent(client=client) if review else None
-        self.runner    = RunnerAgent(real=real_run)
-        self.healer    = HealerAgent(client=client) if self_heal else None
-        self.reporter  = ReporterAgent(client=client)
+        self.ingestor   = IngestorAgent()
+        self.planner    = PlannerAgent(client=client)
+        self.sdet_agent = SDETAgent(client=client) if sdet else None
+        self.generator  = GeneratorAgent(client=client)
+        self.reviewer   = ReviewerAgent(client=client) if review else None
+        self.runner     = RunnerAgent(real=real_run)
+        self.healer     = HealerAgent(client=client) if self_heal else None
+        self.reporter   = ReporterAgent(client=client)
 
         if demo:
             from agents.demo_stubs import install_demo_stubs
@@ -92,16 +95,28 @@ class QAPipeline:
             if on_stage:
                 on_stage(stage, artifact)
 
-        payload = self.ingestor.run(ref);       emit("ingested",  payload)
-        plan    = self.planner.run(payload);     emit("planned",   plan)
-        suite   = self.generator.run(plan);      emit("generated", suite)
+        payload = self.ingestor.run(ref);        emit("ingested",  payload)
 
+        # ── planning stage: SDET agent (formal techniques) or standard Planner ──
+        sdet_plan: Optional[SDETTestPlan] = None
+        if self.sdet_agent:
+            sdet_plan = self.sdet_agent.run(payload)
+            plan      = sdet_plan.to_test_plan()   # downcast for Generator compat
+            emit("sdet",    sdet_plan)
+            emit("planned", plan)
+        else:
+            plan = self.planner.run(payload);      emit("planned",  plan)
+
+        suite = self.generator.run(plan);          emit("generated", suite)
+
+        # ── quality review (uses richer sdet_plan when available) ──
         review: Optional[ReviewReport] = None
         if self.reviewer:
-            review = self.reviewer.run(plan, suite)
+            review_plan = sdet_plan.to_test_plan() if sdet_plan else plan
+            review = self.reviewer.run(review_plan, suite)
             emit("reviewed", review)
 
-        results = self.runner.run(suite);        emit("tested",    results)
+        results = self.runner.run(suite);          emit("tested",   results)
 
         healing_log: list[HealingAttempt] = []
         if self.healer and results.failed:
@@ -115,7 +130,9 @@ class QAPipeline:
         report.self_healing_log = healing_log
         emit("reported", report)
 
-        return PipelineTrace(payload, plan, suite, review, results, report, healing_log)
+        return PipelineTrace(
+            payload, plan, sdet_plan, suite, review, results, report, healing_log
+        )
 
 
 # ── CLI entry point ─────────────────────────────────────────────
@@ -135,6 +152,8 @@ if __name__ == "__main__":
                     help="with --demo, also stub the GitHub issue (fully offline)")
     ap.add_argument("--no-review", action="store_true",
                     help="skip the ReviewerAgent quality audit (saves one LLM call)")
+    ap.add_argument("--sdet", action="store_true",
+                    help="use SDETAgent (formal test-design techniques) instead of Planner")
     args = ap.parse_args()
 
     def log(stage, art):
@@ -143,11 +162,23 @@ if __name__ == "__main__":
     ref = IssueRef(repo=args.repo, issue_number=args.issue, github_token=args.token)
     trace = QAPipeline(
         real_run=args.real, demo=args.demo, offline=args.offline,
-        review=not args.no_review,
+        review=not args.no_review, sdet=args.sdet,
     ).run(ref, on_stage=log)
 
     print(f"\nIssue #{trace.payload.issue_number}: {trace.payload.title}")
-    print(f"Plan: {len(trace.plan.scenarios)} scenarios, risk={trace.plan.risk_level.value}")
+    if trace.sdet_plan:
+        sp = trace.sdet_plan
+        p0s  = sum(1 for t in sp.test_cases if t.priority == "P0")
+        techniques = sorted({t.technique for t in sp.test_cases})
+        types_used = sorted({t.type for t in sp.test_cases})
+        print(f"SDET: {len(sp.test_cases)} cases  P0={p0s}  "
+              f"techniques=[{', '.join(techniques)}]")
+        print(f"      types=[{', '.join(types_used)}]  gaps={len(sp.coverage_gaps)}")
+        if sp.coverage_gaps:
+            for g in sp.coverage_gaps:
+                print(f"      GAP {g.requirement_ref}: {g.reason}")
+    else:
+        print(f"Plan: {len(trace.plan.scenarios)} scenarios, risk={trace.plan.risk_level.value}")
 
     if trace.review:
         rv = trace.review
