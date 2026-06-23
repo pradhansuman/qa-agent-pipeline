@@ -85,18 +85,16 @@ test('TC-STORE-PERF-06: DOM node count stays under 400 with full cart open', asy
 });
 
 // ── TC-STORE-PERF-07 ──────────────────────────────────────────────────────────
-test('TC-STORE-PERF-07: total calculation for 10 items × 3 qty completes in under 5ms', async ({ page }) => {
+test('TC-STORE-PERF-07: updateCartUI() on a 10-item × 3-qty cart completes in under 5ms', async ({ page }) => {
+  // PRODUCTS is a const — not on window; measure updateCartUI() (which does the calculation)
   const ms = await page.evaluate(() => {
-    const PRODUCTS = (window as any).PRODUCTS;
-    const cart: Record<number, number> = {};
-    for (let id = 1; id <= 10; id++) cart[id] = 3;
-
+    for (let id = 1; id <= 10; id++) {
+      (window as any).addToCart(id);
+      (window as any).changeQty(id, 1);
+      (window as any).changeQty(id, 1);
+    }
     const t0 = performance.now();
-    const ids = Object.keys(cart).map(Number);
-    ids.reduce((s, id) => {
-      const p = PRODUCTS.find((x: any) => x.id === id);
-      return s + p.price * cart[id];
-    }, 0);
+    (window as any).updateCartUI();
     return performance.now() - t0;
   });
 

@@ -28,10 +28,11 @@ test('TC-STORE-LOOP-01: adding all 10 products × 3 cycles gives cart count of 3
 
 // ── TC-STORE-LOOP-02 ──────────────────────────────────────────────────────────
 test('TC-STORE-LOOP-02: incrementing qty 20 times gives final qty of 21', async ({ page }) => {
+  // cart is a const in the page scope — not a window property; read via localStorage
   const qty = await page.evaluate(() => {
     (window as any).addToCart(1);
     for (let i = 0; i < 20; i++) (window as any).changeQty(1, 1);
-    return (window as any).cart[1];
+    return JSON.parse(localStorage.getItem('shopnow-cart') || '{}')['1'] as number;
   });
 
   expect(qty).toBe(21);
@@ -44,7 +45,9 @@ test('TC-STORE-LOOP-03: add-then-remove same product 15 times — cart stays emp
       (window as any).addToCart(3);
       (window as any).removeItem(3);
     }
-    return Object.keys((window as any).cart).length === 0;
+    // Read via localStorage — cart const is not on window
+    const stored = JSON.parse(localStorage.getItem('shopnow-cart') || '{}');
+    return Object.keys(stored).length === 0;
   });
 
   expect(isEmpty).toBe(true);
@@ -183,10 +186,9 @@ test('TC-STORE-LOOP-12: full lifecycle × 3 — add all → clear cart → repea
       for (let id = 1; id <= 10; id++) (window as any).addToCart(id);
       const afterAdd = parseInt(document.getElementById('cart-count')!.textContent || '0', 10);
 
-      // Clear cart state directly (bypasses alert in checkout())
-      Object.keys((window as any).cart).forEach((k: string) => delete (window as any).cart[+k]);
-      localStorage.removeItem('shopnow-cart');
-      (window as any).updateCartUI();
+      // Clear via removeItem() for each product — avoids window.cart (const, not on window)
+      // and avoids the alert() inside checkout()
+      for (let id = 1; id <= 10; id++) (window as any).removeItem(id);
 
       const afterClear = parseInt(document.getElementById('cart-count')!.textContent || '0', 10);
       log.push({ afterAdd, afterClear });
