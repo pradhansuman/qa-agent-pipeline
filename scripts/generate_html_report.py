@@ -25,10 +25,17 @@ SUITE_META = {
     'store-network':  {'label': 'State Resilience',  'icon': '🔁', 'color': '#f97316'},
 }
 
-DEFAULT_RESULTS = Path('test-results-store/results.json')
-DEFAULT_OUTPUT  = Path('store-qa-report.html')
-HISTORY_FILE    = Path('store-qa-history.json')
-HISTORY_MAX     = 30  # keep last 30 runs in the trend chart
+DEFAULT_RESULTS      = Path('test-results-store/results.json')
+DEFAULT_UNIT_RESULTS = Path('test-results-unit/unit-results.json')
+DEFAULT_OUTPUT       = Path('store-qa-report.html')
+HISTORY_FILE         = Path('store-qa-history.json')
+HISTORY_MAX          = 30  # keep last 30 runs in the trend chart
+
+TIER_META = {
+    'smoke':      {'label': 'Smoke',      'icon': '🔥', 'color': '#f97316', 'bg': '#431407', 'desc': 'Fast pre-deploy gate'},
+    'regression': {'label': 'Regression', 'icon': '🔁', 'color': '#60a5fa', 'bg': '#0c1a2e', 'desc': 'Full coverage suite'},
+    'unit':       {'label': 'Unit',       'icon': '🧩', 'color': '#a78bfa', 'bg': '#14102b', 'desc': 'Python unit tests'},
+}
 
 
 def _load_history() -> list:
@@ -55,6 +62,33 @@ def _append_history(data: dict) -> list:
     runs = runs[-HISTORY_MAX:]
     HISTORY_FILE.write_text(json.dumps(runs, indent=2), encoding='utf-8')
     return runs
+
+
+def parse_unit_results(json_path: Path) -> dict:
+    """Parse pytest-json-report output into a normalised dict."""
+    if not json_path.exists():
+        return {'tests': [], 'total': 0, 'passed': 0, 'failed': 0, 'dur_str': '—'}
+    raw = json.loads(json_path.read_text(encoding='utf-8'))
+    summary = raw.get('summary', {})
+    tests = []
+    for t in raw.get('tests', []):
+        nodeid   = t.get('nodeid', '')
+        parts    = nodeid.split('::')
+        module   = parts[0].split('/')[-1].replace('.py', '') if parts else '?'
+        name     = '::'.join(parts[1:]) if len(parts) > 1 else nodeid
+        outcome  = t.get('outcome', 'unknown')
+        dur_ms   = int(t.get('duration', 0) * 1000)
+        tests.append({'module': module, 'name': name, 'status': outcome, 'duration_ms': dur_ms})
+    dur_ms  = int(raw.get('duration', 0) * 1000)
+    m, s    = divmod(dur_ms // 1000, 60)
+    dur_str = f'{m}m {s}s' if m else f'{s}s'
+    return {
+        'tests':   tests,
+        'total':   summary.get('total',  len(tests)),
+        'passed':  summary.get('passed', 0),
+        'failed':  summary.get('failed', 0),
+        'dur_str': dur_str,
+    }
 
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
@@ -262,6 +296,40 @@ tr[data-status="flaky"]  td { background: rgba(210,153,34,.03); }
   background: rgba(210,153,34,.2); color: var(--flaky); margin-left: 6px; font-weight: 700;
 }
 tr.hidden { display: none; }
+
+/* ── Tier badges ──────────────────────────────────────────────────────────── */
+.tier-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  padding: 2px 7px; border-radius: 20px; white-space: nowrap;
+}
+.tier-smoke      { background: #431407; color: #fb923c; border: 1px solid #9a3412; }
+.tier-regression { background: #0c1a2e; color: #60a5fa; border: 1px solid #1d4ed8; }
+.tier-unit       { background: #14102b; color: #a78bfa; border: 1px solid #7c3aed; }
+
+/* ── Tier KPI row ─────────────────────────────────────────────────────────── */
+.tier-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+.tier-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+}
+.tier-icon { font-size: 1.6rem; line-height: 1; }
+.tier-info { flex: 1; }
+.tier-name  { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.tier-count { font-size: 1.4rem; font-weight: 800; color: var(--hi); line-height: 1.2; }
+.tier-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tier-pct   { font-size: 1rem; font-weight: 700; }
+
+/* ── Unit tests table ─────────────────────────────────────────────────────── */
+.unit-table { width: 100%; border-collapse: collapse; }
+.unit-table th { background: var(--card2); color: var(--muted); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .5px; padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--border); }
+.unit-table td { padding: 7px 12px; font-size: 13px; border-bottom: 1px solid #1f242c; }
+.unit-table tr:hover td { background: rgba(255,255,255,.03); }
+.unit-fail td { color: var(--fail); }
+.unit-pass td { color: var(--text); }
+.unit-module { font-size: 11px; color: var(--muted); font-family: monospace; }
 
 /* ── Footer ───────────────────────────────────────────────────────────────── */
 footer {
@@ -492,14 +560,16 @@ function filterTable() {
   const suite = document.getElementById('sfilt').value;
   const brow  = document.getElementById('bfilt').value;
   const stat  = document.getElementById('stfilt').value;
+  const tier  = document.getElementById('tfilt') ? document.getElementById('tfilt').value : '';
   const rows  = document.querySelectorAll('#tbody tr');
   let vis = 0;
   rows.forEach(row => {
     const title  = row.querySelector('.test-title').textContent.toLowerCase();
-    const show   = (!q    || title.includes(q))
-                && (!suite || row.dataset.suite === suite)
-                && (!brow  || row.dataset.browser === brow)
-                && (!stat  || row.dataset.status === stat);
+    const show   = (!q     || title.includes(q))
+                && (!suite || row.dataset.suite    === suite)
+                && (!brow  || row.dataset.browser  === brow)
+                && (!stat  || row.dataset.status   === stat)
+                && (!tier  || row.dataset.tier     === tier);
     row.classList.toggle('hidden', !show);
     if (show) vis++;
   });
@@ -542,14 +612,16 @@ def _walk(suite: dict, file_key: str = '') -> list:
                 continue
             last  = results[-1]
             flaky = len(results) > 1 and last.get('status') == 'passed'
+            raw_title = spec.get('title', '')
             records.append({
                 'suite_key':   file_key,
-                'title':       spec.get('title', ''),
+                'title':       raw_title,
                 'browser':     test.get('projectName', ''),
                 'status':      last.get('status', 'unknown'),
                 'duration_ms': last.get('duration', 0),
                 'flaky':       flaky,
                 'retries':     len(results) - 1,
+                'tier':        'smoke' if '@smoke' in raw_title else 'regression',
             })
     for child in suite.get('suites', []):
         records.extend(_walk(child, file_key))
@@ -588,6 +660,14 @@ def parse_results(json_path: Path) -> dict:
         if t['status'] == 'passed': d['passed'] += 1
         else:                       d['failed'] += 1
 
+    # Tier aggregation (smoke vs regression from @smoke tag in title)
+    tier_data: dict = {}
+    for tier in ('smoke', 'regression'):
+        tier_tests = [t for t in tests if t['tier'] == tier]
+        t_pass = sum(1 for t in tier_tests if t['status'] == 'passed' or t['flaky'])
+        t_fail = sum(1 for t in tier_tests if t['status'] not in ('passed', 'skipped') and not t['flaky'])
+        tier_data[tier] = {'total': len(tier_tests), 'passed': t_pass, 'failed': t_fail}
+
     total  = len(tests)
     passed = sum(1 for t in tests if t['status'] == 'passed' and not t['flaky'])
     flaky  = sum(1 for t in tests if t['flaky'])
@@ -608,6 +688,7 @@ def parse_results(json_path: Path) -> dict:
         'tests':        tests,
         'suite_data':   suite_data,
         'browser_data': browser_data,
+        'tier_data':    tier_data,
         'total':        total,
         'passed':       passed,
         'failed':       failed,
@@ -670,6 +751,16 @@ def _suite_cards(suite_data: dict, order: list) -> str:
     return '\n'.join(parts)
 
 
+def _clean_title(title: str) -> str:
+    """Strip the @smoke tag from test titles for cleaner display."""
+    return title.replace(' @smoke: ', ': ').replace(' @smoke', '').replace('@smoke: ', '')
+
+
+def _tier_chip(tier: str) -> str:
+    m = TIER_META.get(tier, TIER_META['regression'])
+    return f'<span class="tier-chip tier-{tier}">{m["icon"]} {m["label"]}</span>'
+
+
 def _test_rows(tests: list) -> str:
     rows = []
     for t in tests:
@@ -677,13 +768,34 @@ def _test_rows(tests: list) -> str:
         sc    = _status_cls(t['status'], t['flaky'])
         icon  = _status_icon(t['status'], t['flaky'])
         retry = '<span class="retry-badge">retry</span>' if t['retries'] else ''
+        tier  = t.get('tier', 'regression')
         rows.append(
-            f'<tr data-suite="{t["suite_key"]}" data-browser="{t["browser"]}" data-status="{sc}">'
+            f'<tr data-suite="{t["suite_key"]}" data-browser="{t["browser"]}" '
+            f'data-status="{sc}" data-tier="{tier}">'
             f'<td><span class="status-dot {sc}" title="{sc}">{icon}</span></td>'
-            f'<td class="test-title">{t["title"]}{retry}</td>'
+            f'<td class="test-title">{_clean_title(t["title"])}{retry}</td>'
+            f'<td>{_tier_chip(tier)}</td>'
             f'<td><span class="chip" style="border-color:{meta["color"]};color:{meta["color"]}">'
             f'{meta["icon"]} {meta["label"]}</span></td>'
             f'<td class="browser-cell">{t["browser"]}</td>'
+            f'<td class="dur-cell">{_ms(t["duration_ms"])}</td>'
+            f'</tr>'
+        )
+    return '\n'.join(rows)
+
+
+def _unit_rows(unit_tests: list) -> str:
+    rows = []
+    for t in unit_tests:
+        passed = t['status'] == 'passed'
+        icon   = '✓' if passed else '✗'
+        cls    = 'unit-pass' if passed else 'unit-fail'
+        dot_cls = 'passed' if passed else 'failed'
+        rows.append(
+            f'<tr class="{cls}">'
+            f'<td><span class="status-dot {dot_cls}">{icon}</span></td>'
+            f'<td class="test-title">{t["name"]}</td>'
+            f'<td class="unit-module">{t["module"]}</td>'
             f'<td class="dur-cell">{_ms(t["duration_ms"])}</td>'
             f'</tr>'
         )
@@ -742,12 +854,48 @@ def generate(data: dict) -> str:
     cards_html = _suite_cards(data['suite_data'], so)
     rows_html  = _test_rows(sorted_tests)
 
+    # Unit test section
+    unit   = data.get('unit', {'tests': [], 'total': 0, 'passed': 0, 'failed': 0, 'dur_str': '—'})
+    unit_rows_html = _unit_rows(unit['tests'])
+
+    # Tier KPI cards
+    td = data.get('tier_data', {})
+    tier_cards_html = ''
+    for tier_key, tier_info in TIER_META.items():
+        if tier_key == 'unit':
+            total_t  = unit['total']
+            passed_t = unit['passed']
+            failed_t = unit['failed']
+        else:
+            bucket   = td.get(tier_key, {'total': 0, 'passed': 0, 'failed': 0})
+            total_t  = bucket['total']
+            passed_t = bucket['passed']
+            failed_t = bucket['failed']
+        pct_t    = round(100 * passed_t / total_t) if total_t else 0
+        pct_col  = '#3fb950' if failed_t == 0 else '#f85149'
+        tier_cards_html += (
+            f'<div class="tier-card">'
+            f'<div class="tier-icon">{tier_info["icon"]}</div>'
+            f'<div class="tier-info">'
+            f'<div class="tier-name">{tier_info["label"]}</div>'
+            f'<div class="tier-count" style="color:{tier_info["color"]}">'
+            f'{passed_t}<span style="color:var(--muted);font-size:.9rem;font-weight:500">/{total_t}</span></div>'
+            f'<div class="tier-desc">{tier_info["desc"]}</div>'
+            f'</div>'
+            f'<div class="tier-pct" style="color:{pct_col}">{pct_t}%</div>'
+            f'</div>\n'
+        )
+
     # Filter dropdown options
     suite_opts   = '\n'.join(
         f'<option value="{k}">{SUITE_META.get(k, {"label":k})["label"]}</option>'
         for k in so
     )
     browser_opts = '\n'.join(f'<option value="{b}">{b}</option>' for b in bl)
+    tier_opts    = '\n'.join(
+        f'<option value="{k}">{v["icon"]} {v["label"]}</option>'
+        for k, v in TIER_META.items() if k != 'unit'
+    )
 
     total = data['total']
     p     = data['passed']
@@ -862,6 +1010,14 @@ def generate(data: dict) -> str:
         '</div>\n'
         '</section>\n'
 
+        # ─── Tier overview ──────────────────────────────────────────────
+        '<section>\n'
+        '<div class="stitle">Test Tiers</div>\n'
+        '<div class="tier-grid">\n'
+        + tier_cards_html +
+        '</div>\n'
+        '</section>\n'
+
         # ─── Suite breakdown ────────────────────────────────────────────
         '<section>\n'
         '<div class="stitle">Suite Breakdown</div>\n'
@@ -901,6 +1057,10 @@ def generate(data: dict) -> str:
         '      <option value="failed">Failed</option>\n'
         '      <option value="flaky">Flaky</option>\n'
         '    </select>\n'
+        '    <select id="tfilt" onchange="filterTable()">\n'
+        '      <option value="">All Tiers</option>\n'
+        + tier_opts + '\n'
+        '    </select>\n'
         '  </div>\n'
         f'  <div class="tc-count" id="tc-count">Showing {total} of {total}</div>\n'
         '</div>\n'
@@ -909,9 +1069,10 @@ def generate(data: dict) -> str:
         '<thead><tr>\n'
         '  <th onclick="sortTable(0)">Status</th>\n'
         '  <th onclick="sortTable(1)">Test</th>\n'
-        '  <th onclick="sortTable(2)">Suite</th>\n'
-        '  <th onclick="sortTable(3)">Browser</th>\n'
-        '  <th onclick="sortTable(4)" style="text-align:right">Duration</th>\n'
+        '  <th onclick="sortTable(2)">Tier</th>\n'
+        '  <th onclick="sortTable(3)">Suite</th>\n'
+        '  <th onclick="sortTable(4)">Browser</th>\n'
+        '  <th onclick="sortTable(5)" style="text-align:right">Duration</th>\n'
         '</tr></thead>\n'
         '<tbody id="tbody">\n'
         + rows_html + '\n'
@@ -919,6 +1080,25 @@ def generate(data: dict) -> str:
         '</table>\n'
         '</div>\n'
         '</section>\n'
+
+        # ─── Unit Tests ─────────────────────────────────────────────────
+        + (
+        '<section>\n'
+        '<div class="stitle">🧩 Unit Tests '
+        f'<span class="tier-chip tier-unit" style="font-size:12px;margin-left:8px">'
+        f'UNIT &nbsp;·&nbsp; {unit["passed"]}/{unit["total"]} passed &nbsp;·&nbsp; {unit["dur_str"]}'
+        f'</span></div>\n'
+        '<div class="tw">\n'
+        '<table class="unit-table">\n'
+        '<thead><tr><th>Status</th><th>Test</th><th>Module</th><th style="text-align:right">Duration</th></tr></thead>\n'
+        '<tbody>\n'
+        + unit_rows_html + '\n'
+        '</tbody>\n'
+        '</table>\n'
+        '</div>\n'
+        '</section>\n'
+        if unit['total'] > 0 else ''
+        ) +
 
         '</main>\n'
 
@@ -955,6 +1135,10 @@ def main() -> None:
         '--output', '-o', type=Path, default=DEFAULT_OUTPUT,
         help=f'Output HTML path (default: {DEFAULT_OUTPUT})',
     )
+    ap.add_argument(
+        '--unit-results', type=Path, default=DEFAULT_UNIT_RESULTS,
+        help=f'Path to pytest-json-report output (default: {DEFAULT_UNIT_RESULTS})',
+    )
     args = ap.parse_args()
 
     if not args.results.exists():
@@ -965,12 +1149,20 @@ def main() -> None:
     print(f'Parsing {args.results} …')
     data = parse_results(args.results)
 
+    # Parse unit test results (optional — skipped gracefully if file absent)
+    unit = parse_unit_results(args.unit_results)
+    data['unit'] = unit
+    if unit['total']:
+        print(f'Unit tests: {unit["passed"]}/{unit["total"]} passed  ({args.unit_results})')
+    else:
+        print(f'Unit results not found at {args.unit_results} — unit section will be hidden')
+
     # Persist this run to the rolling history file, then embed it in the report
     history = _append_history(data)
     data['history'] = history
     print(f'History: {len(history)} run(s) tracked in {HISTORY_FILE}')
 
-    print(f'Building report ({data["total"]} tests, {data["pass_pct"]}% pass rate) …')
+    print(f'Building report ({data["total"]} E2E tests, {data["pass_pct"]}% pass rate) …')
     html = generate(data)
 
     args.output.write_text(html, encoding='utf-8')

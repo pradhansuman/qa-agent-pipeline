@@ -67,6 +67,17 @@ else
   log "--report-only: skipping test run, reusing last results.json"
 fi
 
+# ── 1b. Run Python unit tests ─────────────────────────────────────────────────
+if [ "$REPORT_ONLY" = false ] && [ "$SMOKE" = false ]; then
+  echo ""
+  log "Running Python unit tests…"
+  mkdir -p test-results-unit
+  python -m pytest tests/unit/test_gate.py tests/unit/test_triage.py \
+    tests/unit/test_contracts.py tests/unit/test_mobile.py \
+    --json-report --json-report-file=test-results-unit/unit-results.json \
+    -q --tb=short 2>&1 | grep -v "^$" || true
+fi
+
 # ── 2. Generate HTML report ────────────────────────────────────────────────────
 echo ""
 log "Generating HTML report…"
