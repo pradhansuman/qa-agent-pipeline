@@ -45,9 +45,10 @@ test('AX-STORE-03: keyboard Tab reaches the cart button from the first Add-to-Ca
   // Start focus at first Add to Cart button
   await page.locator('[data-testid="add-to-cart"]').first().focus();
 
-  // Tab until we land on the cart button (max 20 tabs to avoid infinite loop)
+  // Tab until we land on the cart button (max 50 — Firefox cycles all 10 product
+  // buttons before wrapping back to the sticky header where cart-btn lives)
   let found = false;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 50; i++) {
     await page.keyboard.press('Tab');
     const focused = await page.evaluate(() => document.activeElement?.id);
     if (focused === 'cart-btn') { found = true; break; }

@@ -97,5 +97,23 @@
     "pct": 76,
     "gate": "FAIL",
     "dur": "7.0m 5.0s"
+  },
+  {
+    "ts": "June 23, 2026 at 08:09 UTC",
+    "total": 324,
+    "passed": 246,
+    "failed": 77,
+    "pct": 76,
+    "gate": "FAIL",
+    "dur": "7.0m 5.0s"
+  },
+  {
+    "ts": "June 23, 2026 at 08:26 UTC",
+    "total": 250,
+    "passed": 247,
+    "failed": 2,
+    "pct": 99,
+    "gate": "FAIL",
+    "dur": "3.0m 28.0s"
   }
 ]

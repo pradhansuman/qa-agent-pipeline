@@ -41,10 +41,12 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
       testIgnore: ['**/store-visual.spec.ts'],
     },
-    {
+    // Mobile Safari (WebKit) — requires macOS 14+ locally; always runs in CI.
+    // Skipped automatically when the webkit binary is unavailable.
+    ...(process.env.CI || process.env.INCLUDE_SAFARI ? [{
       name: 'Mobile Safari',
       use: { ...devices['iPhone 14'] },
       testIgnore: ['**/store-visual.spec.ts'],
-    },
+    }] : []),
   ],
 });
