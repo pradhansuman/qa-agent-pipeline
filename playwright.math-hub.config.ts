@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: '**/math-hub.spec.golden.ts',
+  testMatch: '**/math-hub*.spec.ts',
   fullyParallel: true,
   workers: 4,
   retries: 1,
@@ -20,6 +20,10 @@ export default defineConfig({
   projects: [
     { name: 'Desktop Chrome',  use: { ...devices['Desktop Chrome'] } },
     { name: 'Mobile Chrome',   use: { ...devices['Pixel 7'] } },
-    { name: 'Mobile Safari',   use: { ...devices['iPhone 14'] } },
+    // Mobile Safari (WebKit) runs in CI (Linux, Playwright Docker) — not locally on macOS 13
+    // To run locally: PWTEST_WEBKIT=1 npx playwright test --config playwright.math-hub.config.ts
+    ...(process.env.PWTEST_WEBKIT ? [
+      { name: 'Mobile Safari', use: { ...devices['iPhone 14'] } },
+    ] : []),
   ],
 });
