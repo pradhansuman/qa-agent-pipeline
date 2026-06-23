@@ -13,6 +13,7 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report-store', open: 'never' }],
+    ['json', { outputFile: 'test-results-store/results.json' }],
   ],
   snapshotDir: './tests/e2e/__snapshots__',
   snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{projectName}/{arg}{ext}',

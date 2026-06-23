@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopNow QA Report — PASS</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d1117; --card: #161b22; --card2: #0d1117; --border: #30363d;
+  --text: #c9d1d9; --muted: #8b949e; --hi: #e6edf3;
+  --pass: #3fb950; --fail: #f85149; --flaky: #d29922; --skip: #8b949e;
+  --accent: #7c3aed; --blue: #2563eb;
+  --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 14px; line-height: 1.5; min-height: 100vh;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+header {
+  background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #1a1a3e 70%, #0f1a3d 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 28px 40px 20px;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(8px);
+}
+.hd-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.brand  { display: flex; align-items: center; gap: 16px; }
+.brand-icon {
+  width: 52px; height: 52px; border-radius: 14px; display: flex;
+  align-items: center; justify-content: center; font-size: 26px;
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  box-shadow: 0 4px 20px rgba(124,58,237,.5);
+  flex-shrink: 0;
+}
+h1 { font-size: 22px; font-weight: 700; letter-spacing: -.4px; color: var(--hi); }
+.run-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.gate-badge {
+  padding: 7px 22px; border-radius: 24px;
+  font-weight: 700; font-size: 14px; letter-spacing: 1px;
+  backdrop-filter: blur(4px);
+}
+.gate-pass { background: rgba(63,185,80,.12); color: var(--pass); border: 1.5px solid rgba(63,185,80,.35); }
+.gate-fail { background: rgba(248,81,73,.12); color: var(--fail); border: 1.5px solid rgba(248,81,73,.35); }
+.hd-tags {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px;
+  align-items: center;
+}
+.hd-tag {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pass); display: inline-block; }
+
+/* ── Main layout ──────────────────────────────────────────────────────────── */
+main { max-width: 1380px; margin: 0 auto; padding: 36px 40px; display: flex; flex-direction: column; gap: 36px; }
+@media (max-width: 768px) { main { padding: 20px 16px; } header { padding: 20px 16px; } }
+
+/* ── Section titles ───────────────────────────────────────────────────────── */
+.stitle {
+  font-size: 15px; font-weight: 600; color: var(--hi);
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.stitle::before {
+  content: ''; width: 3px; height: 18px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--blue));
+  display: inline-block;
+}
+
+/* ── KPI grid ─────────────────────────────────────────────────────────────── */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
+
+.kpi {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px 24px; position: relative; overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.kpi:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.kpi::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.kpi-total::before  { background: linear-gradient(90deg, var(--accent), var(--blue)); }
+.kpi-pass::before   { background: var(--pass); }
+.kpi-fail::before   { background: var(--fail); }
+.kpi-flaky::before  { background: var(--flaky); }
+.kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+.kpi-value { font-size: 44px; font-weight: 800; line-height: 1.1; margin: 6px 0 4px; }
+.kpi-total  .kpi-value { color: var(--hi); }
+.kpi-pass   .kpi-value { color: var(--pass); }
+.kpi-fail   .kpi-value { color: var(--fail); }
+.kpi-flaky  .kpi-value { color: var(--flaky); }
+.kpi-sub { font-size: 12px; color: var(--muted); }
+.kpi-icon { position: absolute; bottom: 14px; right: 16px; font-size: 32px; opacity: .1; }
+
+/* ── Charts grid ──────────────────────────────────────────────────────────── */
+.charts-grid { display: grid; grid-template-columns: 1fr 2.2fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .charts-grid { grid-template-columns: 1fr; } }
+
+.cc {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px 24px;
+}
+.cc h3 {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px;
+  color: var(--muted); margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+}
+.cc h3::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.chart-rel { position: relative; }
+.chart-center {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none;
+}
+.chart-center-val { font-size: 28px; font-weight: 800; color: var(--hi); line-height: 1; }
+.chart-center-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Suite cards ──────────────────────────────────────────────────────────── */
+.suite-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+
+.sc {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 22px; transition: transform .2s, box-shadow .2s;
+}
+.sc:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.sc-hd { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.sc-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.sc-info { flex: 1; min-width: 0; }
+.sc-name { font-size: 14px; font-weight: 600; color: var(--hi); }
+.sc-file { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.sc-pct  { font-size: 24px; font-weight: 800; line-height: 1; flex-shrink: 0; }
+.pb-track { height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+.pb-fill  { height: 100%; border-radius: 3px; transition: width .8s cubic-bezier(.16,1,.3,1); }
+.sc-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
+.sc-stats .pass { color: var(--pass); }
+.sc-stats .fail { color: var(--fail); }
+
+/* ── Table section ────────────────────────────────────────────────────────── */
+.tc-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+input[type="search"], select {
+  background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); padding: 8px 12px; font-size: 13px;
+  outline: none; transition: border-color .2s; appearance: none;
+}
+input[type="search"] { width: 240px; }
+input[type="search"]::placeholder { color: var(--muted); }
+input[type="search"]:focus, select:focus { border-color: var(--accent); }
+select { padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+
+.tc-count { font-size: 12px; color: var(--muted); white-space: nowrap; align-self: center; }
+
+.tw { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 11px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted); background: rgba(255,255,255,.025);
+  border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap;
+  user-select: none; cursor: pointer;
+}
+thead th:last-child { text-align: right; }
+thead th:hover { color: var(--hi); }
+thead th.sort-asc::after  { content: ' ↑'; }
+thead th.sort-desc::after { content: ' ↓'; }
+
+td {
+  padding: 10px 14px; border-bottom: 1px solid rgba(48,54,61,.4);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+tr[data-status="failed"] td { background: rgba(248,81,73,.03); }
+tr[data-status="flaky"]  td { background: rgba(210,153,34,.03); }
+
+.status-dot {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 11px;
+  font-weight: 800; flex-shrink: 0;
+}
+.status-dot.passed  { background: rgba(63,185,80,.15);  color: var(--pass); }
+.status-dot.failed  { background: rgba(248,81,73,.15);  color: var(--fail); }
+.status-dot.flaky   { background: rgba(210,153,34,.15); color: var(--flaky); }
+.status-dot.skipped { background: rgba(139,148,158,.1); color: var(--skip); }
+
+.test-title { font-size: 12.5px; max-width: 480px; word-break: break-word; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 2px 8px; border-radius: 12px; border: 1px solid;
+  white-space: nowrap; font-weight: 500;
+}
+.browser-cell { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.dur-cell     { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.retry-badge  {
+  display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 4px;
+  background: rgba(210,153,34,.2); color: var(--flaky); margin-left: 6px; font-weight: 700;
+}
+tr.hidden { display: none; }
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+footer {
+  text-align: center; padding: 24px 40px; color: var(--muted);
+  border-top: 1px solid var(--border); font-size: 12px;
+}
+footer strong { color: var(--text); }
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.kpi, .cc, .sc { animation: fadeUp .4s ease both; }
+.kpi:nth-child(1) { animation-delay: .05s; }
+.kpi:nth-child(2) { animation-delay: .10s; }
+.kpi:nth-child(3) { animation-delay: .15s; }
+.kpi:nth-child(4) { animation-delay: .20s; }
+
+</style>
+</head>
+<body>
+<header>
+  <div class="hd-top">
+    <div class="brand">
+      <div class="brand-icon">🧪</div>
+      <div>
+        <h1>ShopNow QA Report</h1>
+        <div class="run-meta">June 23, 2026 at 04:44 UTC &nbsp;·&nbsp; 1.0m 1.0s</div>
+      </div>
+    </div>
+    <div class="gate-badge gate-pass">PASS</div>
+  </div>
+  <div class="hd-tags">
+    <span class="hd-tag"><span class="dot"></span>120 tests</span>
+    <span class="hd-tag">·</span>
+    <span class="hd-tag">Desktop Chrome + Mobile Chrome (Pixel 7)</span>
+    <span class="hd-tag">·</span>
+    <span class="hd-tag">zero-to-test-ai</span>
+  </div>
+</header>
+<main>
+<section>
+<div class="kpi-grid">
+  <div class="kpi kpi-total">
+    <div class="kpi-label">Total Tests</div>
+    <div class="kpi-value" id="kv-total">0</div>
+    <div class="kpi-sub">across 5 suites · 2 browsers</div>
+    <div class="kpi-icon">🧪</div>
+  </div>
+  <div class="kpi kpi-pass">
+    <div class="kpi-label">Passed</div>
+    <div class="kpi-value" id="kv-pass">0</div>
+    <div class="kpi-sub">100% pass rate</div>
+    <div class="kpi-icon">✓</div>
+  </div>
+  <div class="kpi kpi-fail">
+    <div class="kpi-label">Failed</div>
+    <div class="kpi-value" id="kv-fail">0</div>
+    <div class="kpi-sub">All clear ✓</div>
+    <div class="kpi-icon">✗</div>
+  </div>
+  <div class="kpi kpi-flaky">
+    <div class="kpi-label">Flaky</div>
+    <div class="kpi-value" id="kv-flaky">0</div>
+    <div class="kpi-sub">Zero flakiness ✓</div>
+    <div class="kpi-icon">⚠</div>
+  </div>
+</div>
+</section>
+<section>
+<div class="stitle">Test Analytics</div>
+<div class="charts-grid">
+  <div class="cc">
+    <h3>Overall Pass Rate</h3>
+    <div class="chart-rel" style="height:180px">
+      <canvas id="passChart"></canvas>
+      <div class="chart-center">
+        <div class="chart-center-val">100%</div>
+        <div class="chart-center-lbl">pass rate</div>
+      </div>
+    </div>
+    <div class="legend" style="margin-top:14px">
+      <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div>Passed (120)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>Failed (0)</div>
+    </div>
+  </div>
+  <div class="cc">
+    <h3>Tests by Suite</h3>
+    <div class="chart-rel" style="height:210px">
+      <canvas id="suiteChart"></canvas>
+    </div>
+  </div>
+  <div class="cc">
+    <h3>By Browser</h3>
+    <div class="chart-rel" style="height:180px">
+      <canvas id="browserChart"></canvas>
+    </div>
+  </div>
+</div>
+</section>
+<section>
+<div class="stitle">Suite Breakdown</div>
+<div class="suite-grid">
+<div class="sc"><div class="sc-hd"><span class="sc-icon">📋</span><div class="sc-info"><div class="sc-name">Contract / API</div><div class="sc-file">store-api.spec.ts</div></div><div class="sc-pct" style="color:#3b82f6">100%</div></div><div class="pb-track"><div class="pb-fill" style="width:100%;background:#3b82f6"></div></div><div class="sc-stats"><span>24 tests</span><span class="pass">✓ 24 passed</span><span style="color:var(--muted)">avg 1.9s</span></div></div>
+<div class="sc"><div class="sc-hd"><span class="sc-icon">🔄</span><div class="sc-info"><div class="sc-name">Endurance Loops</div><div class="sc-file">store-loop.spec.ts</div></div><div class="sc-pct" style="color:#8b5cf6">100%</div></div><div class="pb-track"><div class="pb-fill" style="width:100%;background:#8b5cf6"></div></div><div class="sc-stats"><span>24 tests</span><span class="pass">✓ 24 passed</span><span style="color:var(--muted)">avg 1.3s</span></div></div>
+<div class="sc"><div class="sc-hd"><span class="sc-icon">⚡</span><div class="sc-info"><div class="sc-name">Performance</div><div class="sc-file">store-perf.spec.ts</div></div><div class="sc-pct" style="color:#f59e0b">100%</div></div><div class="pb-track"><div class="pb-fill" style="width:100%;background:#f59e0b"></div></div><div class="sc-stats"><span>20 tests</span><span class="pass">✓ 20 passed</span><span style="color:var(--muted)">avg 1.3s</span></div></div>
+<div class="sc"><div class="sc-hd"><span class="sc-icon">🔐</span><div class="sc-info"><div class="sc-name">Security</div><div class="sc-file">store-security.spec.ts</div></div><div class="sc-pct" style="color:#ef4444">100%</div></div><div class="pb-track"><div class="pb-fill" style="width:100%;background:#ef4444"></div></div><div class="sc-stats"><span>24 tests</span><span class="pass">✓ 24 passed</span><span style="color:var(--muted)">avg 1.5s</span></div></div>
+<div class="sc"><div class="sc-hd"><span class="sc-icon">🎨</span><div class="sc-info"><div class="sc-name">Visual Regression</div><div class="sc-file">store-visual.spec.ts</div></div><div class="sc-pct" style="color:#10b981">100%</div></div><div class="pb-track"><div class="pb-fill" style="width:100%;background:#10b981"></div></div><div class="sc-stats"><span>28 tests</span><span class="pass">✓ 28 passed</span><span style="color:var(--muted)">avg 1.9s</span></div></div>
+</div>
+</section>
+<section>
+<div class="tc-header">
+  <div class="stitle" style="margin-bottom:0">All Tests</div>
+  <div class="filters">
+    <input type="search" id="srch" placeholder="🔍  Search tests…" oninput="filterTable()">
+    <select id="sfilt" onchange="filterTable()">
+      <option value="">All Suites</option>
+<option value="store-api">Contract / API</option>
+<option value="store-loop">Endurance Loops</option>
+<option value="store-perf">Performance</option>
+<option value="store-security">Security</option>
+<option value="store-visual">Visual Regression</option>
+    </select>
+    <select id="bfilt" onchange="filterTable()">
+      <option value="">All Browsers</option>
+<option value="Desktop Chrome">Desktop Chrome</option>
+<option value="Mobile Chrome">Mobile Chrome</option>
+    </select>
+    <select id="stfilt" onchange="filterTable()">
+      <option value="">All Status</option>
+      <option value="passed">Passed</option>
+      <option value="failed">Failed</option>
+      <option value="flaky">Flaky</option>
+    </select>
+  </div>
+  <div class="tc-count" id="tc-count">Showing 120 of 120</div>
+</div>
+<div class="tw">
+<table>
+<thead><tr>
+  <th onclick="sortTable(0)">Status</th>
+  <th onclick="sortTable(1)">Test</th>
+  <th onclick="sortTable(2)">Suite</th>
+  <th onclick="sortTable(3)">Browser</th>
+  <th onclick="sortTable(4)" style="text-align:right">Duration</th>
+</tr></thead>
+<tbody id="tbody">
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-01: page loads and product grid is visible</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.8s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-02: document title is "Online Store"</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-03: all required data-testid attributes are present exactly once</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">2.0s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-04: product grid renders exactly 10 product cards</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-05: every product card exposes name, price, and add-to-cart testids</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-06: PRODUCTS array has exactly 10 items with valid schema</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-07: all product data-product-id values are unique</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.0s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-08: cart initialises as empty in a fresh browser context</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.0s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-09: page is self-contained — no external script or link[rel=stylesheet] sources</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">585ms</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-10: cart data written to localStorage matches expected schema after adding items</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-11: product prices in DOM are valid and adding all 10 gives correct total</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-api" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-12: cart count in header matches actual cart item count at all times</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-01: page loads and product grid is visible</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.2s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-02: document title is "Online Store"</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.0s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-03: all required data-testid attributes are present exactly once</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">3.2s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-04: product grid renders exactly 10 product cards</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.9s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-05: every product card exposes name, price, and add-to-cart testids</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.5s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-06: PRODUCTS array has exactly 10 items with valid schema</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.1s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-07: all product data-product-id values are unique</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.8s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-08: cart initialises as empty in a fresh browser context</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.8s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-09: page is self-contained — no external script or link[rel=stylesheet] sources</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.4s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-10: cart data written to localStorage matches expected schema after adding items</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.8s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-11: product prices in DOM are valid and adding all 10 gives correct total</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.6s</td></tr>
+<tr data-suite="store-api" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-API-12: cart count in header matches actual cart item count at all times</td><td><span class="chip" style="border-color:#3b82f6;color:#3b82f6">📋 Contract / API</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.3s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-01: adding all 10 products × 3 cycles gives cart count of 30</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-02: incrementing qty 20 times gives final qty of 21</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">753ms</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-03: add-then-remove same product 15 times — cart stays empty</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">969ms</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-04: 30 cart toggles (even) — sidebar ends in closed state</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-05: adding product 3 twenty-five times — total equals $998.75</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-06: localStorage stays in sync through 20 add/remove cycles</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-07: 10 rapid toast fires — last toast shows "Running Shoes"</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">991ms</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-08: checkout button enable/disable state correct through 10 add/remove cycles</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-09: cart count badge is accurate through 25 sequential adds</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-10: all 10 products added once — total equals $545.85</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-11: 50 rapid cart toggles — no CSS class corruption</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-loop" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-12: full lifecycle × 3 — add all → clear cart → repeat</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-01: adding all 10 products × 3 cycles gives cart count of 30</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.9s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-02: incrementing qty 20 times gives final qty of 21</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">974ms</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-03: add-then-remove same product 15 times — cart stays empty</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-04: 30 cart toggles (even) — sidebar ends in closed state</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-05: adding product 3 twenty-five times — total equals $998.75</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-06: localStorage stays in sync through 20 add/remove cycles</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-07: 10 rapid toast fires — last toast shows "Running Shoes"</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-08: checkout button enable/disable state correct through 10 add/remove cycles</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-09: cart count badge is accurate through 25 sequential adds</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-10: all 10 products added once — total equals $545.85</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-11: 50 rapid cart toggles — no CSS class corruption</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-loop" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-LOOP-12: full lifecycle × 3 — add all → clear cart → repeat</td><td><span class="chip" style="border-color:#8b5cf6;color:#8b5cf6">🔄 Endurance Loops</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-01: renderProducts() completes in under 50ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-02: addToCart() executes in under 5ms (JIT-warm)</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">814ms</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-03: updateCartUI() with 10-item cart executes in under 20ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-04: adding all 10 products completes in under 100ms total</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-05: localStorage write completes in under 5ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-06: DOM node count stays under 400 with full cart open</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-07: updateCartUI() on a 10-item × 3-qty cart completes in under 5ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-08: showToast() executes in under 5ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-09: removeItem() on a 10-item cart executes in under 10ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-perf" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-10: page renders all 10 product cards within 1000ms of navigation</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-01: renderProducts() completes in under 50ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-02: addToCart() executes in under 5ms (JIT-warm)</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-03: updateCartUI() with 10-item cart executes in under 20ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-04: adding all 10 products completes in under 100ms total</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-05: localStorage write completes in under 5ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-06: DOM node count stays under 400 with full cart open</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.0s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-07: updateCartUI() on a 10-item × 3-qty cart completes in under 5ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-08: showToast() executes in under 5ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-09: removeItem() on a 10-item cart executes in under 10ms</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-perf" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-PERF-10: page renders all 10 product cards within 1000ms of navigation</td><td><span class="chip" style="border-color:#f59e0b;color:#f59e0b">⚡ Performance</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-01: no eval() call in page JavaScript source</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-02: only "shopnow-cart" key written to localStorage after full interaction</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-03: localStorage cart values are positive integers only (no strings or objects)</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-04: cart total is always a valid dollar amount (never NaN or Infinity)</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-05: checkout clears all items from the localStorage cart</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">2.4s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-06: no console errors during normal add/remove/checkout flow</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-07: no external network requests are made by the page</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-08: checkout() is a no-op when cart is empty — internal guard prevents corruption</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-09: product names in the DOM contain no script tags or event handlers</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-10: cart item HTML contains no injected script markup</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-11: page is self-contained — no external script or stylesheet sources</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">896ms</td></tr>
+<tr data-suite="store-security" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-12: cart count badge always shows a non-negative integer throughout add/remove cycle</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-01: no eval() call in page JavaScript source</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-02: only "shopnow-cart" key written to localStorage after full interaction</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-03: localStorage cart values are positive integers only (no strings or objects)</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-04: cart total is always a valid dollar amount (never NaN or Infinity)</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-05: checkout clears all items from the localStorage cart</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">4.0s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-06: no console errors during normal add/remove/checkout flow</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-07: no external network requests are made by the page</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-08: checkout() is a no-op when cart is empty — internal guard prevents corruption</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-09: product names in the DOM contain no script tags or event handlers</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-10: cart item HTML contains no injected script markup</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-11: page is self-contained — no external script or stylesheet sources</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-security" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">TC-STORE-SEC-12: cart count badge always shows a non-negative integer throughout add/remove cycle</td><td><span class="chip" style="border-color:#ef4444;color:#ef4444">🔐 Security</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-01: full page — product grid</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">4.4s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-02: sticky header with cart button</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-03: first product card (Wireless Headphones)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">2.2s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-04: cart button — initial empty state (count = 0)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-05: cart button — count updates to 3 after three adds</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-06: cart sidebar open — empty state</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-07: cart sidebar with one item</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.8s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-08: cart sidebar with three different items</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-09: cart footer — total and checkout button with items</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-10: checkout button — disabled state (empty cart)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.2s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-11: checkout button — enabled state (cart has items)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.3s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-12: quantity controls for an item with qty = 3</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-13: full page — mobile viewport layout</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">2.3s</td></tr>
+<tr data-suite="store-visual" data-browser="Desktop Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-14: cart sidebar open on mobile viewport</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Desktop Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-01: full page — product grid</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">5.7s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-02: sticky header with cart button</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.7s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-03: first product card (Wireless Headphones)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.0s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-04: cart button — initial empty state (count = 0)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-05: cart button — count updates to 3 after three adds</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.1s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-06: cart sidebar open — empty state</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.9s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-07: cart sidebar with one item</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.9s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-08: cart sidebar with three different items</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.0s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-09: cart footer — total and checkout button with items</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.5s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-10: checkout button — disabled state (empty cart)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-11: checkout button — enabled state (cart has items)</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.8s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-12: quantity controls for an item with qty = 3</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.4s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-13: full page — mobile viewport layout</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">2.6s</td></tr>
+<tr data-suite="store-visual" data-browser="Mobile Chrome" data-status="passed"><td><span class="status-dot passed" title="passed">✓</span></td><td class="test-title">VR-STORE-14: cart sidebar open on mobile viewport</td><td><span class="chip" style="border-color:#10b981;color:#10b981">🎨 Visual Regression</span></td><td class="browser-cell">Mobile Chrome</td><td class="dur-cell">1.6s</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<footer>
+<p>Generated by <strong>zero-to-test-ai</strong> · ShopNow Store QA Suite · June 23, 2026 at 04:44 UTC</p>
+</footer>
+<script>
+const DATA = {
+  "kpi": {
+    "total": 120,
+    "passed": 120,
+    "failed": 0,
+    "flaky": 0
+  },
+  "passRate": {
+    "passed": 120,
+    "failed": 0,
+    "flaky": 0
+  },
+  "suites": {
+    "labels": [
+      "Contract / API",
+      "Endurance Loops",
+      "Performance",
+      "Security",
+      "Visual Regression"
+    ],
+    "colors": [
+      "#3b82f6",
+      "#8b5cf6",
+      "#f59e0b",
+      "#ef4444",
+      "#10b981"
+    ],
+    "passed": [
+      24,
+      24,
+      20,
+      24,
+      28
+    ],
+    "failed": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "browsers": {
+    "labels": [
+      "Desktop Chrome",
+      "Mobile Chrome"
+    ],
+    "passed": [
+      60,
+      60
+    ]
+  }
+};
+</script>
+<script>
+
+// ── KPI counter animation ────────────────────────────────────────────────────
+function animateCount(id, target, delay) {
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const duration = 700;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(ease * target);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, delay);
+}
+animateCount('kv-total', DATA.kpi.total, 100);
+animateCount('kv-pass',  DATA.kpi.passed, 200);
+animateCount('kv-fail',  DATA.kpi.failed, 200);
+animateCount('kv-flaky', DATA.kpi.flaky,  200);
+
+// ── Chart defaults ───────────────────────────────────────────────────────────
+Chart.defaults.color = '#8b949e';
+Chart.defaults.font.family = "-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
+Chart.defaults.font.size = 12;
+
+// ── Pass Rate Doughnut ───────────────────────────────────────────────────────
+new Chart(document.getElementById('passChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Passed', 'Failed', 'Flaky'],
+    datasets: [{
+      data: [DATA.passRate.passed, DATA.passRate.failed, DATA.passRate.flaky],
+      backgroundColor: [
+        'rgba(63,185,80,.85)',
+        'rgba(248,81,73,.85)',
+        'rgba(210,153,34,.85)',
+      ],
+      borderColor: ['#3fb950', '#f85149', '#d29922'],
+      borderWidth: 2,
+      hoverOffset: 8,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '74%',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#161b22',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        callbacks: {
+          label: (ctx) => `  ${ctx.label}: ${ctx.parsed} tests`
+        }
+      }
+    }
+  }
+});
+
+// ── Suite Horizontal Bar ─────────────────────────────────────────────────────
+new Chart(document.getElementById('suiteChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.suites.labels,
+    datasets: [
+      {
+        label: 'Passed',
+        data: DATA.suites.passed,
+        backgroundColor: DATA.suites.colors.map(c => c + 'bb'),
+        borderColor: DATA.suites.colors,
+        borderWidth: 1.5,
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+      {
+        label: 'Failed',
+        data: DATA.suites.failed,
+        backgroundColor: 'rgba(248,81,73,.7)',
+        borderColor: '#f85149',
+        borderWidth: 1.5,
+        borderRadius: 4,
+        borderSkipped: false,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { boxWidth: 12, padding: 14, color: '#8b949e' }
+      },
+      tooltip: {
+        backgroundColor: '#161b22',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        callbacks: {
+          label: (ctx) => `  ${ctx.dataset.label}: ${ctx.parsed.x} tests`
+        }
+      }
+    },
+    scales: {
+      x: {
+        stacked: false,
+        grid: { color: 'rgba(48,54,61,.5)' },
+        ticks: { stepSize: 5, color: '#8b949e' },
+        border: { color: '#30363d' },
+      },
+      y: {
+        grid: { display: false },
+        ticks: { font: { size: 12 }, color: '#c9d1d9' },
+        border: { color: '#30363d' },
+      }
+    }
+  }
+});
+
+// ── Browser Doughnut ─────────────────────────────────────────────────────────
+new Chart(document.getElementById('browserChart'), {
+  type: 'doughnut',
+  data: {
+    labels: DATA.browsers.labels,
+    datasets: [{
+      data: DATA.browsers.passed,
+      backgroundColor: ['rgba(124,58,237,.85)', 'rgba(37,99,235,.85)'],
+      borderColor: ['#7c3aed', '#2563eb'],
+      borderWidth: 2,
+      hoverOffset: 8,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '74%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { boxWidth: 12, padding: 12, color: '#8b949e' }
+      },
+      tooltip: {
+        backgroundColor: '#161b22',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        callbacks: {
+          label: (ctx) => `  ${ctx.label}: ${ctx.parsed} tests`
+        }
+      }
+    }
+  }
+});
+
+// ── Table filter ─────────────────────────────────────────────────────────────
+function filterTable() {
+  const q     = document.getElementById('srch').value.toLowerCase();
+  const suite = document.getElementById('sfilt').value;
+  const brow  = document.getElementById('bfilt').value;
+  const stat  = document.getElementById('stfilt').value;
+  const rows  = document.querySelectorAll('#tbody tr');
+  let vis = 0;
+  rows.forEach(row => {
+    const title  = row.querySelector('.test-title').textContent.toLowerCase();
+    const show   = (!q    || title.includes(q))
+                && (!suite || row.dataset.suite === suite)
+                && (!brow  || row.dataset.browser === brow)
+                && (!stat  || row.dataset.status === stat);
+    row.classList.toggle('hidden', !show);
+    if (show) vis++;
+  });
+  document.getElementById('tc-count').textContent = `Showing ${vis} of ${rows.length}`;
+}
+
+// ── Table sort ───────────────────────────────────────────────────────────────
+let _sortCol = -1, _sortAsc = true;
+function sortTable(col) {
+  const ths  = document.querySelectorAll('thead th');
+  if (_sortCol === col) { _sortAsc = !_sortAsc; } else { _sortCol = col; _sortAsc = true; }
+  ths.forEach((th, i) => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (i === col) th.classList.add(_sortAsc ? 'sort-asc' : 'sort-desc');
+  });
+  const tbody = document.getElementById('tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const av = a.cells[col].textContent.trim();
+    const bv = b.cells[col].textContent.trim();
+    const cmp = av.localeCompare(bv, undefined, { numeric: true });
+    return _sortAsc ? cmp : -cmp;
+  });
+  tbody.append(...rows);
+}
+
+</script>
+</body>
+</html>
