@@ -63,14 +63,15 @@ test('CWV-STORE-03: Cumulative Layout Shift is under 0.1 during normal shopping 
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForSelector('.card');
 
-  // Observe CLS across the shopping interaction
+  // Observe CLS from this point forward only (no buffered: true — that replays
+  // load-time shifts which are outside the scope of this interaction test)
   await page.evaluate(() => {
     (window as any).__clsValue = 0;
     new PerformanceObserver(list => {
       for (const entry of list.getEntries() as any[]) {
         if (!entry.hadRecentInput) (window as any).__clsValue += entry.value;
       }
-    }).observe({ type: 'layout-shift', buffered: true });
+    }).observe({ type: 'layout-shift' });
   });
 
   // Simulate typical user flow that could cause layout shifts
