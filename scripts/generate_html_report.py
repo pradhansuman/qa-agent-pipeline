@@ -15,11 +15,11 @@ from pathlib import Path
 
 # ── Suite display metadata ─────────────────────────────────────────────────────
 SUITE_META = {
-    'store-api':      {'label': 'Contract / API',    'icon': '📋', 'color': '#3b82f6'},
-    'store-loop':     {'label': 'Endurance Loops',   'icon': '🔄', 'color': '#8b5cf6'},
-    'store-perf':     {'label': 'Performance',       'icon': '⚡', 'color': '#f59e0b'},
-    'store-security': {'label': 'Security',          'icon': '🔐', 'color': '#ef4444'},
     'store-visual':   {'label': 'Visual Regression', 'icon': '🎨', 'color': '#10b981'},
+    'store-api':      {'label': 'Contract / API',    'icon': '📋', 'color': '#3b82f6'},
+    'store-security': {'label': 'Security',          'icon': '🔐', 'color': '#ef4444'},
+    'store-perf':     {'label': 'Performance',       'icon': '⚡', 'color': '#f59e0b'},
+    'store-loop':     {'label': 'Endurance Loops',   'icon': '🔄', 'color': '#8b5cf6'},
 }
 
 DEFAULT_RESULTS = Path('test-results-store/results.json')
@@ -618,6 +618,10 @@ def generate(data: dict) -> str:
     so = [k for k in SUITE_META if k in data['suite_data']]
     so += [k for k in data['suite_data'] if k not in so]
 
+    # Sort tests by SUITE_META priority order so the table rows match the card order
+    suite_rank = {k: i for i, k in enumerate(so)}
+    sorted_tests = sorted(data['tests'], key=lambda t: suite_rank.get(t['suite_key'], 999))
+
     bd = data['browser_data']
     bl = list(bd.keys())
 
@@ -649,7 +653,7 @@ def generate(data: dict) -> str:
 
     gate_cls   = 'gate-pass' if data['gate'] == 'PASS' else 'gate-fail'
     cards_html = _suite_cards(data['suite_data'], so)
-    rows_html  = _test_rows(data['tests'])
+    rows_html  = _test_rows(sorted_tests)
 
     # Filter dropdown options
     suite_opts   = '\n'.join(
