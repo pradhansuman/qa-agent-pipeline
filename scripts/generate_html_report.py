@@ -730,6 +730,26 @@ def _status_icon(status: str, flaky: bool) -> str:
     return '○'
 
 
+def _run_label(so: list, tests: list) -> str:
+    """Derive a human-readable run label from which suites are actually present."""
+    n = len(so)
+    if n == 0:
+        return 'Empty Run'
+    # Smoke run: every test has @smoke in its tier
+    if tests and all(t.get('tier') == 'smoke' for t in tests):
+        return 'Smoke Run'
+    # Single suite — name it directly
+    if n == 1:
+        return f'{SUITE_META.get(so[0], {}).get("label", so[0])} Run'
+    # Full suite — all known suites present
+    if set(so) >= set(SUITE_META.keys()):
+        return 'Full Suite Run'
+    # Partial run — list up to 2 suite names
+    labels = [SUITE_META.get(k, {'label': k})['label'] for k in so[:2]]
+    suffix = f' +{n - 2} more' if n > 2 else ''
+    return ', '.join(labels) + suffix
+
+
 def _suite_cards(suite_data: dict, order: list) -> str:
     parts = []
     for key in order:
@@ -861,6 +881,10 @@ def generate(data: dict) -> str:
     chart_json = json.dumps(chart_data, indent=2)
 
     gate_cls   = 'gate-pass' if data['gate'] == 'PASS' else 'gate-fail'
+    run_label  = _run_label(so, data['tests'])
+    browser_label = ' + '.join(bl) if bl else 'Desktop Chrome'
+    suite_count_label = f'{len(so)} suite{"s" if len(so) != 1 else ""}'
+    browser_count_label = f'{len(bl)} browser{"s" if len(bl) != 1 else ""}'
     cards_html = _suite_cards(data['suite_data'], so)
     rows_html  = _test_rows(sorted_tests)
 
@@ -923,7 +947,7 @@ def generate(data: dict) -> str:
         '<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        f'<title>ShopNow QA Report — {data["gate"]}</title>\n'
+        f'<title>ShopNow QA — {run_label} — {data["gate"]}</title>\n'
         '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>\n'
         '<style>\n' + CSS + '\n</style>\n'
         '</head>\n'
@@ -935,7 +959,7 @@ def generate(data: dict) -> str:
         '    <div class="brand">\n'
         '      <div class="brand-icon">🧪</div>\n'
         '      <div>\n'
-        f'        <h1>ShopNow QA Report</h1>\n'
+        f'        <h1>ShopNow QA — {run_label}</h1>\n'
         f'        <div class="run-meta">{data["start_str"]} &nbsp;·&nbsp; {data["dur_str"]}</div>\n'
         '      </div>\n'
         '    </div>\n'
@@ -945,7 +969,7 @@ def generate(data: dict) -> str:
         '    <span class="hd-tag"><span class="dot"></span>'
         f'{total} tests</span>\n'
         '    <span class="hd-tag">·</span>\n'
-        '    <span class="hd-tag">Desktop Chrome + Mobile Chrome (Pixel 7)</span>\n'
+        f'    <span class="hd-tag">{browser_label}</span>\n'
         '    <span class="hd-tag">·</span>\n'
         '    <span class="hd-tag">zero-to-test-ai</span>\n'
         '  </div>\n'
@@ -959,7 +983,7 @@ def generate(data: dict) -> str:
         '  <div class="kpi kpi-total">\n'
         '    <div class="kpi-label">Total Tests</div>\n'
         '    <div class="kpi-value" id="kv-total">0</div>\n'
-        '    <div class="kpi-sub">across 5 suites · 2 browsers</div>\n'
+        f'    <div class="kpi-sub">across {suite_count_label} · {browser_count_label}</div>\n'
         '    <div class="kpi-icon">🧪</div>\n'
         '  </div>\n'
         '  <div class="kpi kpi-pass">\n'
