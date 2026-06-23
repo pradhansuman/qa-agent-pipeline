@@ -1,4 +1,4 @@
-name: Playwright E2E Tests
+name: QA Test Pyramid
 
 on:
   push:
@@ -6,63 +6,164 @@ on:
   pull_request:
     branches: [main, master]
 
+# Cancel in-progress runs on the same branch so a new push doesn't queue behind an old one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    name: E2E – Chromium
+  # ── Job 1: Dynamic prioritization ─────────────────────────────────────────
+  # Computes --grep pattern from diff so downstream jobs run only at-risk tests.
+  # Full suite always runs on push to main.
+  prioritize:
+    name: Prioritize Tests
     runs-on: ubuntu-latest
+    outputs:
+      grep: ${{ steps.compute.outputs.grep }}
+      full_run: ${{ steps.compute.outputs.full_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Compute test priority
+        id: compute
+        run: |
+          pip install -q pydantic requests
+          if [ "${{ github.event_name }}" = "push" ] && \
+             [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "grep=" >> $GITHUB_OUTPUT
+            echo "full_run=true" >> $GITHUB_OUTPUT
+          else
+            GREP=$(python scripts/prioritize_tests.py --base HEAD~1 2>/dev/null || echo "")
+            echo "grep=$GREP" >> $GITHUB_OUTPUT
+            echo "full_run=false" >> $GITHUB_OUTPUT
+          fi
+          python scripts/prioritize_tests.py --json 2>/dev/null >> $GITHUB_STEP_SUMMARY || true
+
+  # ── Job 2: Playwright test pyramid ────────────────────────────────────────
+  playwright:
+    name: Playwright — ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    needs: prioritize
     container:
       image: mcr.microsoft.com/playwright:v1.44.0-jammy
 
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - golden
+          - api
+          - perf
+          - security
+          - loop
+          - visual
+
     steps:
-      # ── Checkout ───────────────────────────────────────────────────
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ── Node setup ─────────────────────────────────────────────────
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      # ── Dependencies ───────────────────────────────────────────────
       - name: Install npm dependencies
-        run: npm ci
+        run: npm install
 
-      # ── Run tests ──────────────────────────────────────────────────
-      - name: Run Playwright tests
-        run: npx playwright test --workers=4 --retries=1
+      - name: Map suite to spec file
+        id: spec
+        run: |
+          case "${{ matrix.suite }}" in
+            golden)   echo "file=tests/e2e/math-hub.spec.golden.ts"   >> $GITHUB_OUTPUT ;;
+            api)      echo "file=tests/e2e/math-hub-api.spec.ts"      >> $GITHUB_OUTPUT ;;
+            perf)     echo "file=tests/e2e/math-hub-perf.spec.ts"     >> $GITHUB_OUTPUT ;;
+            security) echo "file=tests/e2e/math-hub-security.spec.ts" >> $GITHUB_OUTPUT ;;
+            loop)     echo "file=tests/e2e/math-hub-loop.spec.ts"     >> $GITHUB_OUTPUT ;;
+            visual)   echo "file=tests/e2e/math-hub-visual.spec.ts"   >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Run ${{ matrix.suite }} suite
+        run: |
+          GREP_ARG=""
+          if [ -n "${{ needs.prioritize.outputs.grep }}" ] && \
+             [ "${{ needs.prioritize.outputs.full_run }}" = "false" ]; then
+            GREP_ARG="--grep ${{ needs.prioritize.outputs.grep }}"
+          fi
+          npx playwright test \
+            --config playwright.math-hub.config.ts \
+            --project "Desktop Chrome" \
+            --project "Mobile Chrome" \
+            --workers 4 \
+            --retries 1 \
+            ${{ steps.spec.outputs.file }} \
+            $GREP_ARG
         env:
           CI: true
 
-      # ── Upload HTML report on failure ──────────────────────────────
-      - name: Upload Playwright report
+      - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: playwright-report-${{ matrix.suite }}
+          path: playwright-report-math-hub/
           retention-days: 14
 
-      # ── Upload test screenshots / traces ───────────────────────────
-      - name: Upload test results (traces + screenshots)
+      - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.suite }}
           path: test-results/
           retention-days: 7
 
-      # ── Summary badge in PR ────────────────────────────────────────
-      - name: Add test summary
-        if: always()
+  # ── Job 3: Pipeline smoke test ─────────────────────────────────────────────
+  pipeline-smoke:
+    name: Pipeline Smoke (offline demo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run offline demo pipeline
+        run: python -m orchestrator.pipeline --demo --offline
+
+      - name: Run Python unit tests
+        run: python -m pytest tests/unit/ -q --tb=short
+
+  # ── Job 4: CI summary ─────────────────────────────────────────────────────
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [prioritize, playwright, pipeline-smoke]
+    if: always()
+    steps:
+      - name: Write job summary
         run: |
-          echo "## Playwright Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## QA Pipeline Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Status | Detail |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          if [ ${{ job.status }} = "success" ]; then
-            echo "| ✅ Passed | All tests passed |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ Failed | See artifact for HTML report |" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+
+          PW="${{ needs.playwright.result }}"
+          SMOKE="${{ needs.pipeline-smoke.result }}"
+
+          [ "$PW" = "success" ] \
+            && echo "| Playwright test pyramid | ✅ All suites passed |" >> $GITHUB_STEP_SUMMARY \
+            || echo "| Playwright test pyramid | ❌ $PW |" >> $GITHUB_STEP_SUMMARY
+
+          [ "$SMOKE" = "success" ] \
+            && echo "| Pipeline smoke + unit tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY \
+            || echo "| Pipeline smoke + unit tests | ❌ $SMOKE |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Suites:** golden E2E · API/HTTP · performance · security · endurance · visual" >> $GITHUB_STEP_SUMMARY
+          echo "**Browsers:** Desktop Chrome · Mobile Chrome (Pixel 7)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ needs.prioritize.outputs.grep }}" ]; then
+            echo "**Prioritized grep:** \`${{ needs.prioritize.outputs.grep }}\`" >> $GITHUB_STEP_SUMMARY
           fi

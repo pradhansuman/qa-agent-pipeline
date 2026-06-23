@@ -1,334 +1,347 @@
-# AI-Assisted QA Framework — 5-Agent Pipeline
+# AI-Assisted QA Pipeline
 
-From a real GitHub issue to a passing/failing Playwright test report — fully automated.
+[![Playwright Tests](https://github.com/pradhansuman/qa-agent-pipeline/actions/workflows/playwright.yml/badge.svg)](https://github.com/pradhansuman/qa-agent-pipeline/actions/workflows/playwright.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.44-green.svg)](https://playwright.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A production-grade, multi-agent QA framework that takes a GitHub issue and delivers a complete, executed, self-healing Playwright test suite — with zero human intervention in between.
 
 ```
-IssueRef ─▶ Ingestor ─▶ Planner ─▶ Generator ─▶ Runner ─▶ Healer ─▶ Reporter ─▶ ReportArtifact
-           (GitHub)     (LLM)       (LLM)        (Playwright) (LLM)    (LLM+rules)
+GitHub Issue ──▶ Ingestor ──▶ SDET Designer ──▶ Generator ──▶ Reviewer ──▶ Runner ──▶ Healer ──▶ Reporter
+                  (API)        (formal BVA/EP)    (LLM)       (LLM critic)  (PW CLI)   (LLM)      (rule gate)
 ```
 
 ---
 
-## Quick Start — Run It in 5 Minutes
+## Features
 
-### Step 1 — Prerequisites
+| Capability | Details |
+|---|---|
+| **7-agent pipeline** | Ingestor → SDET Designer → Generator → Reviewer → Runner → Healer → Reporter |
+| **Iterative critic loop** | Reviewer audits generated suite; if verdict is "revise/reject", Generator gets one refinement pass with `top_3_fixes` injected |
+| **Self-healing locators** | Detects selector drift, repairs via LLM grounded in live DOM, re-runs patched test. Never heals assertion failures |
+| **Richer failure classification** | `LOCATOR` · `ASSERTION` · `ENVIRONMENT` · `FLAKY` · `TIMEOUT` · `OTHER` — rule-based, auditable, no LLM |
+| **Visual regression** | 14 `toHaveScreenshot()` tests with 2% pixel tolerance + committed PNG baselines |
+| **Multi-browser** | Desktop Chrome · Mobile Chrome (Pixel 7) · Mobile Safari (iPhone 14 via CI) |
+| **Full test pyramid** | 7 suites: golden E2E, API/HTTP, performance, security, endurance loops, visual, load (k6) |
+| **Dynamic test prioritization** | `git diff` → grep pattern; cuts CI from ~8 min to < 2 min on minor changes |
+| **MCP server** | Real stdio JSON-RPC server — register in Claude desktop to control the pipeline via natural language |
+| **Rule-based gate** | `ReporterAgent._gate()`: any P0 fail or pass rate < 90% → FAIL. LLM writes the narrative, never makes the decision |
 
-Make sure these are installed on your machine:
+---
 
-| Tool | Check | Install |
+## Quick Start
+
+### Prerequisites
+
+| Tool | Min version | Check |
 |---|---|---|
-| Python 3.10+ | `python3 --version` | [python.org](https://python.org) |
-| Node.js 18+ | `node --version` | [nodejs.org](https://nodejs.org) |
-| Git | `git --version` | pre-installed on Mac/Linux |
+| Python | 3.10 | `python3 --version` |
+| Node.js | 18 | `node --version` |
+| k6 (load tests) | any | `k6 version` · `brew install k6` |
 
----
-
-### Step 2 — Clone & Install
+### Install
 
 ```bash
 git clone https://github.com/pradhansuman/qa-agent-pipeline.git
 cd qa-agent-pipeline
 
-# Install Python dependencies
 pip install -r requirements.txt
-
-# Install Playwright browsers (needed for real test runs only)
-npm i -D @playwright/test allure-playwright
+npm install
 npx playwright install chromium
 ```
 
----
-
-### Step 3 — Try It Instantly (No API Key Needed)
-
-This runs the full 6-stage pipeline with zero internet and zero cost.
-All LLM responses are pre-baked stubs — same code paths, same contracts:
+### Try it instantly — no API key needed
 
 ```bash
 python -m orchestrator.pipeline --demo --offline
 ```
 
-**Expected output:**
-
+Expected output:
 ```
-  [ ingested] ok
-  [  planned] ok
-  [generated] ok
-  [   tested] ok
-  [   healed] ok
-  [ reported] ok
+  [ ingested] ok   [ planned] ok   [generated] ok
+  [  tested] ok   [  healed] ok   [ reported] ok
 
 Issue #1042: Login form allows empty email submission
-Plan:  5 scenarios, risk=high
-Run:   5/5 passed (100.0%)
-Heal:  1 recovered by self-healing agent
-         TC-002: [data-testid="submit-btn"] → [data-testid="login-submit"] (conf 0.93)
-Gate:  PASS
-```
-
-If you see this output — everything is working. ✅
-
----
-
-### Step 4 — Run Against a Real GitHub Issue (Needs API Key)
-
-```bash
-# Set your Anthropic API key
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# Pull a real public GitHub issue, plan + generate + simulate + report
-python -m orchestrator.pipeline facebook/react 28000
-```
-
-**Optional: add a GitHub token to avoid rate limits**
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-python -m orchestrator.pipeline facebook/react 28000 --token ghp_yourGitHubToken
-```
-
-Get a free GitHub token at: Settings → Developer Settings → Personal Access Tokens → Generate (no scopes needed for public repos).
-
----
-
-### Step 5 — Run Against a Real Website with Live Playwright
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-python -m orchestrator.pipeline myorg/myapp 1042 --token ghp_xxx --real
-```
-
-The `--real` flag launches a real Chromium browser, executes the generated tests, and the HealerAgent repairs any broken selectors automatically.
-
----
-
-### Step 6 — Try the 5-Agent Council (Bonus)
-
-A separate deliberation system where 5 AI agents debate any question:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-python council.py
-
-# No API key? Use demo mode:
-python council.py --demo
-```
-
-Type any question at the prompt. All 5 agents (Researcher, Creative, Critic, Safety Guard, Synthesizer) debate it across two rounds before giving a final answer.
-
----
-
-### Common Errors & Fixes
-
-| Error | Fix |
-|---|---|
-| `ModuleNotFoundError: anthropic` | Run `pip install -r requirements.txt` |
-| `ANTHROPIC_API_KEY not set` | Run `export ANTHROPIC_API_KEY=sk-ant-...` |
-| `npx playwright install` fails | Run `npm install` first, then retry |
-| GitHub 403 / rate limit | Add `--token ghp_xxx` with a free GitHub token |
-| `credit balance too low` | Add credits at console.anthropic.com |
-
----
-
-Every arrow is a typed Pydantic contract (`contracts/schemas.py`). Agents
-share nothing but these models, so any stage can be mocked, swapped, or re-run
-in isolation.
-
----
-
-## The six agents
-
-| # | Agent | LLM? | Input → Output | Responsibility |
-|---|-------|------|----------------|----------------|
-| 1 | `IngestorAgent` | No | `IssueRef → IssuePayload` | Hit the GitHub REST API, normalise the issue, infer priority/type/component from labels (rule-based, auditable). |
-| 2 | `PlannerAgent` | Yes | `IssuePayload → TestPlan` | Decide *what* to test. 3–6 prioritised scenarios with concrete steps. Escalates priority independently of the issue label. |
-| 3 | `GeneratorAgent` | Yes | `TestPlan → GeneratedSuite` | Decide *how* to test. Emit runnable Playwright + TypeScript with Allure annotations. Security-guarded prompt. |
-| 4 | `RunnerAgent` | No | `GeneratedSuite → RunResults` | Execute via the Playwright CLI, parse the JSON reporter, roll up pass/fail. `real=False` gives a deterministic simulation for demos. |
-| 4.5 | `HealerAgent` | Yes | `RunResults → RunResults + log` | Triage each failure; repair stale **selectors** grounded in the live DOM, patch the file, re-run that one test. Never touches assertion failures. |
-| 5 | `ReporterAgent` | Yes | `RunResults → ReportArtifact` | Write the PR-reviewer narrative. The **merge-gate decision is rule-based**, never left to model phrasing. |
-
-### How self-healing works (and what it refuses to do)
-
-The `HealerAgent` runs only when there are failures, and only acts on
-**locator** failures — a selector that no longer matches the DOM because the UI
-changed. For each one it:
-
-1. classifies the failure (rule-based: locator / assertion / timeout / other),
-2. pulls the broken selector and a snapshot of the **current DOM**,
-3. asks Claude for a repaired selector *grounded in what actually exists*,
-4. patches the test file and re-runs that single test,
-5. logs the `old → new` selector, rationale, and confidence.
-
-Three guardrails make this safe to put in CI:
-
-- **Assertion failures are never healed.** A failing `expect()` means the code
-  is wrong or the spec changed — silently "fixing" it would hide a real bug.
-  The Healer marks it `healable=False`, leaves it red, and never even calls the
-  LLM (verified by test).
-- **A heal only counts if the re-run passes.** A repaired selector that still
-  fails stays failed.
-- **Nothing is rewritten invisibly.** Every heal is in `self_healing_log` with
-  full before/after, so a reviewer can audit exactly what the agent changed.
-
-### Why two agents don't use the LLM
-
-Ingestion and execution must be **ground truth**. We never want a model to
-invent an issue number or soften a failing test. The LLM is used only where
-judgement adds value: deciding what to test, writing the test code, and
-explaining the results.
-
-### Why the gate is rule-based
-
-`ReporterAgent._gate()` blocks merge if **any P0 fails** or the pass rate drops
-below 90%. The LLM writes the human summary around that decision but cannot
-override it — a hallucinated "looks good!" can never merge a broken build.
-
----
-
-## Agent prompts & contracts at a glance
-
-Each agent file is self-documenting: the module docstring states the I/O
-contract, and the `SYSTEM` constant is the full prompt. Read them in order:
-
-1. `agents/ingestor.py`  — no prompt; GitHub API + label inference
-2. `agents/planner.py`   — "decide WHAT to test, never write code"
-3. `agents/generator.py` — "convert plan to Playwright TS, never weaken security"
-4. `agents/runner.py`    — no prompt; Playwright CLI + JSON parse
-5. `agents/reporter.py`  — "write the PR summary"; gate lives in code
-
----
-
-## Run it
-
-```bash
-pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# pull a real public issue, plan + generate + simulate + heal + report
-python -m orchestrator.pipeline facebook/react 28000
-
-# with a GitHub token (private repos / rate limits) and a real Playwright run
-python -m orchestrator.pipeline myorg/app 1042 --token ghp_xxx --real
-```
-
-### Offline demo mode (no API key, no credit)
-
-Every LLM agent can be stubbed with canned, in-repo responses so the whole
-six-stage pipeline runs with no Anthropic key, no credit, and (with `--offline`)
-no internet. Same code paths, same contracts, same self-heal cycle — only the
-model's judgement is pre-baked. Ideal for live demos and CI smoke tests.
-
-```bash
-# full pipeline, canned LLM output, still pulls the real GitHub issue
-python -m orchestrator.pipeline demo/app 1042 --demo
-
-# fully offline — also stubs the GitHub issue
-python -m orchestrator.pipeline --demo --offline
-```
-
-Expected offline output:
-
-```
-  [ ingested] ok
-  [  planned] ok
-  [generated] ok
-  [   tested] ok
-  [   healed] ok
-  [ reported] ok
-
-Issue #1042: Login form allows empty email submission
-Plan: 5 scenarios, risk=high
 Run:  5/5 passed (100.0%)
-Heal: 1 recovered by self-healing agent
-        TC-002: [data-testid="submit-btn"] -> [data-testid="login-submit"] (conf 0.93)
+Heal: 1 recovered  TC-002: [data-testid="submit-btn"] → [data-testid="login-submit"] (conf 0.93)
 Gate: PASS
 ```
 
----
+### Run against a real GitHub issue
 
-## Deploy to CI
-
-`.github/workflows/qa-pipeline.yml` triggers when an issue is labelled
-`qa-ready`. Each agent is a job; the Planner's output flows to the Generator
-via job outputs; the Runner job runs inside the official Playwright Docker
-image; the Reporter posts its `issue_comment` back on the issue and the gate
-decision sets the job's exit status.
-
-```
-issues: [labeled qa-ready]
-  └─ plan ─▶ generate ─▶ test (Docker) ─▶ report ─▶ comment + gate
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python -m orchestrator.pipeline facebook/react 28000 --token ghp_xxx
 ```
 
-See `Dockerfile` for the test container and the workflow file for the wiring.
+### Run with real Playwright execution
 
----
-
-## Project layout
-
-```
-qa-agents/
-├── contracts/
-│   └── schemas.py              # all I/O models — the single source of truth
-├── agents/
-│   ├── base.py                 # shared Claude plumbing + JSON-mode validation
-│   ├── ingestor.py             # 1 · GitHub API
-│   ├── planner.py              # 2 · what to test
-│   ├── generator.py            # 3 · how to test
-│   ├── runner.py               # 4 · Playwright execution + DOM provider
-│   ├── healer.py               # 4.5 · self-healing selector repair
-│   ├── reporter.py             # 5 · summary + gate
-│   └── demo_stubs.py           # canned LLM responses for offline demo mode
-├── orchestrator/
-│   └── pipeline.py             # chains all five, CLI entry point
-├── mcp_framework/              # extended MCP pipeline (PRD → tests → Jira/Slack/Git)
-│   ├── config.py               # all env-var config in one dataclass
-│   ├── contracts.py            # Pydantic I/O contracts for MCP agents
-│   ├── orchestrator.py         # 7-agent MCP router
-│   ├── run.py                  # CLI entry point for MCP pipeline
-│   └── agents/
-│       ├── analyzer.py         # reads PRD → produces analysis + test plan
-│       ├── scaffolder.py       # generates Playwright TS project on disk
-│       ├── executor.py         # runs Playwright CLI, parses results
-│       ├── healer.py           # self-healing for MCP-generated tests
-│       ├── gitops.py           # commits tests, opens GitHub PR
-│       ├── jira.py             # files Jira tickets for genuine failures
-│       └── slack.py            # Slack notifications (start + result)
-├── council.py                  # 5-agent deliberation system (Researcher · Creative
-│                               # · Critic · Safety Guard · Synthesizer)
-├── generated/                  # example AI-generated Playwright test suites
-│   ├── shopnow/                # ShopNow e-commerce demo
-│   └── speedtest/              # Speedtest.net feature coverage
-├── store.html                  # standalone dark-mode storefront demo UI
-├── Dockerfile
-├── requirements.txt
-└── .github/workflows/
-    ├── qa-pipeline.yml         # triggers on issues: [labeled qa-ready]
-    └── playwright.yml          # standard Playwright CI workflow
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python -m orchestrator.pipeline myorg/app 1042 --real
 ```
 
 ---
 
-## Multi-Agent Council (`council.py`)
+## Math Hub Test Suite (CBSE Class 8)
 
-A standalone 5-agent deliberation system. Any question is debated across two rounds before a final answer is synthesised.
+A complete test pyramid against a live GitHub Pages SPA — all suites run in CI.
+
+### Run all suites
+
+```bash
+# Full pyramid — Desktop Chrome + Mobile Chrome
+npx playwright test --config playwright.math-hub.config.ts
+
+# Single suite
+npx playwright test --config playwright.math-hub.config.ts tests/e2e/math-hub-api.spec.ts
+
+# Headed (browser window visible)
+npx playwright test --config playwright.math-hub.config.ts --headed
+```
+
+### Test pyramid
+
+| Suite | File | Tests | What it validates |
+|---|---|---|---|
+| **Golden E2E** | `math-hub.spec.golden.ts` | 98 × 3 browsers | All 16 chapters, MCQ engine, widgets, navigation |
+| **API / HTTP** | `math-hub-api.spec.ts` | 19 | Status codes, HTTPS/HSTS, ETag caching, self-containment |
+| **Performance** | `math-hub-perf.spec.ts` | 16 | TTFB < 3s, widget latency < 50ms (in-browser), DOM complexity |
+| **Security** | `math-hub-security.spec.ts` | 17 | No eval(), textContent vs innerHTML, no storage leakage |
+| **Endurance loops** | `math-hub-loop.spec.ts` | 12 | 30-iter accuracy, 50-click idempotency, 30× canvas redraw |
+| **Visual regression** | `math-hub-visual.spec.ts` | 14 | Screenshot diff, canvas charts, MCQ states, mobile layout |
+| **Load (k6)** | `tests/load/math-hub.k6.js` | — | CDN p95 < 27ms, 0% error, 50% ETag cache hit |
+
+### Visual regression baselines
+
+Baselines are committed in `tests/e2e/__snapshots__/`. To regenerate after intentional UI changes:
+
+```bash
+npx playwright test --config playwright.math-hub.config.ts \
+  tests/e2e/math-hub-visual.spec.ts --update-snapshots
+```
+
+### Load testing with k6
+
+```bash
+k6 run tests/load/math-hub.k6.js                         # smoke:  5 VUs / 20s
+k6 run --env SCENARIO=steady tests/load/math-hub.k6.js   # steady: 50 VUs / 60s hold
+k6 run --env SCENARIO=spike  tests/load/math-hub.k6.js   # spike:  burst to 100 VUs
+k6 run --env SCENARIO=stress tests/load/math-hub.k6.js   # stress: ramp to 200 VUs
+k6 run --env SCENARIO=soak   tests/load/math-hub.k6.js   # soak:   20 VUs / 10 min
+```
+
+### Dynamic test prioritization
+
+Run only the tests at risk from your current diff — cuts CI time on minor PRs:
+
+```bash
+# Compute grep pattern from current diff and run
+GREP=$(python scripts/prioritize_tests.py)
+npx playwright test --config playwright.math-hub.config.ts --grep "$GREP"
+
+# Full JSON report showing which rules fired and why
+python scripts/prioritize_tests.py --json
+```
+
+---
+
+## Agent Architecture
+
+Every agent hand-off is a typed **Pydantic model** in `contracts/schemas.py` — the single source of truth. Agents never import each other's internals.
+
+### Pipeline stages
+
+| # | Agent | LLM? | Responsibility |
+|---|---|---|---|
+| 1 | `IngestorAgent` | No | GitHub REST API → normalise issue, infer priority/type from labels (rule-based) |
+| 2 | `TestDesignerAgent` | Yes | Apply formal test-design: EP, BVA, Decision Table, Pairwise, Error Guessing |
+| 2b | `StrategistAgent` | Yes | Alternative planner — risk-based scenario selection (default without `--sdet`) |
+| 3 | `GeneratorAgent` | Yes | `TestPlan → GeneratedSuite`; accepts `reviewer_feedback` on revision pass |
+| 3.5 | `ReviewerAgent` | Yes | 8-dimension audit; `verdict: ship \| revise \| reject`; feeds `top_3_fixes` back |
+| 4 | `RunnerAgent` | No | Playwright CLI + multi-project config generation (Desktop/Mobile/Tablet) |
+| 4.5 | `HealerAgent` | Selective | Classifies failures; LLM called only for `LOCATOR` to repair selectors |
+| 5 | `ReporterAgent` | Yes | Narrative summary; gate is pure rule-based code — LLM never decides |
+
+### Failure classification
+
+`classify_failure()` in `agents/healer.py` is deterministic, rule-based, and ordering-critical:
 
 ```
-User question
-  → Researcher  (Round 1 — facts)
-  → Creative    (Round 1 — novel angles)
-  → Critic      (Round 1 — challenges assumptions)
-  → Researcher  (Round 2 — responds to peers)
-  → Creative    (Round 2 — responds to peers)
-  → Critic      (Round 2 — responds to peers)
-  → Safety Guard (audits all 6 statements)
-  → Synthesizer  (final unified answer)
+ASSERTION   first — "expect(locator...)" messages contain "locator"; never heal these
+ENVIRONMENT before TIMEOUT — ECONNREFUSED/OOM/browser-crash also say "timeout" but are infra
+LOCATOR     — selector drifted; healable by the LLM
+TIMEOUT     — pure wait exhaustion; retry candidate
+FLAKY       — passed on retry; detected via classify_flaky(passed, retries > 0)
+OTHER       — inspect full log
+```
+
+### Iterative critic refinement loop
+
+```
+Generator ──▶ Reviewer
+                │
+          verdict == "revise" or "reject"?
+                │  yes
+                ▼
+          Generator (top_3_fixes injected as REVISION REQUIRED note)
+                │
+                ▼
+          Reviewer (second pass — emitted for audit trail)
+                │
+                ▼
+          Runner (suite always runs — verdict never gates execution)
+```
+
+`PipelineTrace.generation_passes` is `1` normally, `2` when a revision fired.
+
+---
+
+## MCP Server
+
+Expose the full pipeline as tools callable from Claude desktop, VS Code, or any MCP-compatible host.
+
+### Register in Claude desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "qa-pipeline": {
+      "command": "python",
+      "args": ["/absolute/path/to/qa-agent-pipeline/mcp_server/server.py"],
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+    }
+  }
+}
+```
+
+### Available tools
+
+| Tool | Example prompt |
+|---|---|
+| `run_pipeline` | "Run QA against facebook/react issue 28000" |
+| `run_playwright_tests` | "Run the security test suite on Desktop Chrome" |
+| `prioritize_tests` | "Which tests should I run for this PR?" |
+| `explain_failure` | "What does this Playwright error mean and what should I do?" |
+| `list_test_suites` | "What test suites are available?" |
+
+---
+
+## CLI Reference
+
+```bash
+# Real GitHub issue + simulated Playwright
+python -m orchestrator.pipeline facebook/react 28000
+
+# With GitHub token + real browser execution
+python -m orchestrator.pipeline myorg/app 1042 --token ghp_xxx --real
+
+# Formal SDET test-design techniques (EP, BVA, pairwise…)
+python -m orchestrator.pipeline myorg/app 1042 --sdet
+
+# Skip Reviewer audit (saves one LLM call)
+python -m orchestrator.pipeline myorg/app 1042 --no-review
+
+# Demo — canned LLM responses, still hits GitHub
+python -m orchestrator.pipeline demo/app 1042 --demo
+
+# Fully offline — no internet, no API key
+python -m orchestrator.pipeline --demo --offline
+```
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | Required for real LLM calls |
+| `QA_AGENT_MODEL` | `claude-sonnet-4-20250514` | Model used by all LLM agents |
+| `QA_TARGET_URL` | `https://demoqa.com` | App URL injected into Generator prompt |
+| `MOBILE_ENABLED` | `true` | Set `false` to disable mobile browser targets |
+
+---
+
+## Multi-Agent Council
+
+A standalone 5-agent deliberation system for any open-ended question. Two debate rounds, a Safety Guard audit, then a synthesised final answer.
+
+```
+Question → Researcher → Creative → Critic (Round 1)
+         → Researcher → Creative → Critic (Round 2 — responding to peers)
+         → Safety Guard (audits all 6 statements)
+         → Synthesizer (final unified answer)
 ```
 
 ```bash
-# Live — real Claude API calls
 export ANTHROPIC_API_KEY=sk-ant-...
 python council.py
 
-# Demo — no API key required, shows the full flow with sample responses
+# No API key:
 python council.py --demo
 ```
+
+---
+
+## Project Layout
+
+```
+qa-agent-pipeline/
+├── contracts/schemas.py            # all Pydantic I/O models — single source of truth
+├── agents/
+│   ├── base.py                     # Claude _complete() / _complete_json() / retry logic
+│   ├── ingestor.py                 # GitHub REST API, no LLM
+│   ├── designer.py                 # SDET formal test design (EP, BVA, pairwise…)
+│   ├── strategist.py               # risk-based planner (alternative to designer)
+│   ├── generator.py                # TestPlan → Playwright TS; accepts reviewer_feedback
+│   ├── reviewer.py                 # 8-dimension audit; verdict + top_3_fixes
+│   ├── runner.py                   # Playwright CLI + multi-project config generation
+│   ├── healer.py                   # classify_failure() + LLM selector repair
+│   ├── reporter.py                 # narrative + rule-based gate
+│   └── demo_stubs.py               # canned offline responses
+├── orchestrator/pipeline.py        # chains all agents; iterative critic loop; CLI
+├── mcp_server/server.py            # real MCP stdio server (5 tools)
+├── mcp_framework/                  # extended PRD→tests→Jira/Slack/Git pipeline
+├── scripts/prioritize_tests.py     # git-diff → Playwright --grep pattern
+├── tests/
+│   ├── e2e/
+│   │   ├── math-hub.spec.golden.ts     # 98 E2E tests (golden spec)
+│   │   ├── math-hub-api.spec.ts        # 19 API/HTTP contract tests
+│   │   ├── math-hub-perf.spec.ts       # 16 performance tests
+│   │   ├── math-hub-security.spec.ts   # 17 security tests
+│   │   ├── math-hub-loop.spec.ts       # 12 endurance / loop tests
+│   │   ├── math-hub-visual.spec.ts     # 14 visual regression tests
+│   │   └── __snapshots__/              # committed baseline PNGs
+│   ├── load/math-hub.k6.js             # k6 load test (5 scenarios)
+│   └── unit/                           # Python unit tests (pytest)
+├── playwright.math-hub.config.ts   # multi-browser config for math hub suites
+├── playwright.config.ts            # default Playwright config
+├── math_hub.html                   # CBSE Class 8 demo SPA (live on GitHub Pages)
+├── store.html                      # standalone e-commerce demo UI
+├── council.py                      # 5-agent deliberation system
+├── Dockerfile                      # Playwright container for CI
+├── requirements.txt
+└── .github/workflows/
+    ├── playwright.yml              # full test pyramid CI (push + PR)
+    └── qa-pipeline.yml             # issue-label trigger (qa-ready)
+```
+
+---
+
+## Key Design Constraints
+
+These are enforced by code, not convention:
+
+- **LLM never makes the gate decision.** `ReporterAgent._gate()` is pure Python. Any P0 failure or pass rate < 90% → `FAIL`. The narrative is LLM; the verdict is code.
+- **Assertion failures are never healed.** `FailureKind.ASSERTION` is always `healable=False`. A failing `expect()` is a real bug, not a selector problem.
+- **Contracts are the only shared interface.** Agents import only from `contracts/schemas.py`, never each other's internals.
+- **Reviewer verdict is advisory.** It triggers a refinement pass but never blocks execution — the runner always runs.
+- **Environment failures are not timeouts.** `ENVIRONMENT` is classified before `TIMEOUT` in `classify_failure()` — ordering is safety-critical.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

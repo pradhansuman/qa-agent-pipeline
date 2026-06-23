@@ -19,11 +19,15 @@ env/
 node_modules/
 generated/*/node_modules/
 playwright-report/
+playwright-report-math-hub/
 test-results/
 allure-results/
 allure-report/
 blob-report/
 *.zip
+
+# ── QA workspace / temp run artifacts ─────────────────────────────
+.qa-workspace/
 
 # ── Claude Code local settings (personal tool config, not project) ──
 .claude/
@@ -51,7 +55,4 @@ credentials.json
 Suman/
 Suman_Pradhan_ATS_Resume.*
 generate_resume_pdf.py
-FIREBASE_SETUP.md
-FIREBASE_SETUP.md
-FIREBASE_SETUP.md
 FIREBASE_SETUP.md
