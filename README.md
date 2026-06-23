@@ -250,29 +250,205 @@ npx playwright test --config playwright.store.config.ts --headed
 286 tests across 9 suites, 3 browser targets (Desktop Chrome · Desktop Firefox · Mobile Chrome).
 Mobile Safari (iPhone 14) runs in CI only — Playwright WebKit requires macOS 14+ or the CI Playwright Docker image.
 
-| Suite | File | Tests | What it validates |
+| Suite | File | Tests | Purpose |
 |---|---|---|---|
-| **Contract / API** | `store-api.spec.ts` | 12 | PRODUCTS schema, testid completeness, localStorage interface, self-containment |
-| **Performance** | `store-perf.spec.ts` | 10 | renderProducts < 50ms, addToCart < 25ms, DOM size, Navigation Timing |
-| **Core Web Vitals** | `store-cwv.spec.ts` | 8 | FCP, DCL, CLS (interaction-only, no buffered replay), TBT, load event timing |
-| **Security** | `store-security.spec.ts` | 12 | No eval(), localStorage hygiene, XSS guards, no external requests |
-| **Accessibility** | `store-a11y.spec.ts` | 12 | WCAG 2.1 AA via axe-core, keyboard nav, ARIA states, live regions |
-| **Endurance loops** | `store-loop.spec.ts` | 12 | 30-cycle add, 50-toggle CSS, full lifecycle × 3, total accuracy drift |
-| **State & Resilience** | `store-network.spec.ts` | 8 | localStorage persistence across reloads, isolation between contexts, corrupted-data recovery |
-| **Error / Edge Cases** | `store-error.spec.ts` | 12 | Invalid product IDs, boundary qty operations, double-checkout, cart reuse after purchase |
-| **Visual regression** | `store-visual.spec.ts` | 14 | Header, product card, cart states, qty controls, mobile layout |
-| **Load (k6)** | `tests/load/store.k6.js` | — | 4 scenarios (smoke/steady/spike/stress), p95 < 500ms, TTFB < 200ms |
+| **Contract / API** | `store-api.spec.ts` | 12 | Product schema, DOM contracts, localStorage interface |
+| **Performance** | `store-perf.spec.ts` | 10 | JS execution speed, DOM size, Navigation Timing API |
+| **Core Web Vitals** | `store-cwv.spec.ts` | 8 | Google CWV metrics: FCP, DCL, CLS, TBT, load timing |
+| **Security** | `store-security.spec.ts` | 12 | No eval(), XSS guards, localStorage hygiene, self-containment |
+| **Accessibility** | `store-a11y.spec.ts` | 12 | WCAG 2.1 AA: axe-core scan, keyboard nav, ARIA, focus trap |
+| **Endurance loops** | `store-loop.spec.ts` | 12 | 30-cycle accuracy, 50-toggle CSS stability, full lifecycle |
+| **State & Resilience** | `store-network.spec.ts` | 8 | localStorage persistence, context isolation, corrupted-data recovery |
+| **Error / Edge Cases** | `store-error.spec.ts` | 12 | Invalid IDs, boundary qty, double-checkout, NaN guards |
+| **Visual regression** | `store-visual.spec.ts` | 14 | Screenshot diffs (2% tolerance), cart states, mobile layout |
+| **Load (k6)** | `tests/load/store.k6.js` | — | 4 scenarios (smoke/steady/spike/stress), p95 < 500ms |
 
-### Visual regression baselines
+---
 
-Generate baselines on first run (requires `--update-snapshots`):
+### Suite details
+
+#### 1. Contract / API — `store-api.spec.ts`
+**Purpose:** Validates the structural contract of the app — if any of these fail, the entire store is broken for all users.
+
+| Test | What it checks |
+|---|---|
+| API-01 `@smoke` | Page loads and product grid is visible |
+| API-02 | All 10 products have name, price, emoji, description in the DOM |
+| API-03 | Every product has a unique `data-product-id` attribute |
+| API-04 `@smoke` | Exactly 10 product cards rendered — no duplicates, no missing |
+| API-05 | All `data-testid` selectors are present and unique |
+| API-06 | Product prices match the PRODUCTS array values in the DOM |
+| API-07 | All Add-to-Cart buttons are enabled on initial load |
+| API-08 `@smoke` | Cart initialises empty in a fresh browser context |
+| API-09 | localStorage key `shopnow-cart` is written after adding items |
+| API-10 | localStorage schema is a valid `{id: qty}` object |
+| API-11 | Total of all 10 products matches expected sum ($545.85) |
+| API-12 | Cart count badge always matches actual number of items in cart |
+
+---
+
+#### 2. Performance — `store-perf.spec.ts`
+**Purpose:** Measures JavaScript execution speed inside the browser using `performance.now()` — not wall-clock time — so Playwright RPC overhead doesn't inflate the numbers.
+
+| Test | Threshold | What it measures |
+|---|---|---|
+| PERF-01 `@smoke` | < 50ms | `renderProducts()` — building all 10 cards from scratch |
+| PERF-02 | < 25ms | `addToCart()` after JIT warm-up — steady-state speed |
+| PERF-03 | < 20ms | `updateCartUI()` with a full 10-item cart |
+| PERF-04 `@smoke` | < 500ms | Adding all 10 products in a loop |
+| PERF-05 | < 5ms | `localStorage.setItem()` write speed |
+| PERF-06 | < 400 nodes | Total DOM node count with cart open (complexity guard) |
+| PERF-07 | < 25ms | `updateCartUI()` on a 10-item × 3-qty cart |
+| PERF-08 | < 5ms | `showToast()` — toast display trigger |
+| PERF-09 | < 50ms | `removeItem()` on a full 10-item cart |
+| PERF-10 | < 3000ms | Navigation Timing API: all 10 cards visible after page load |
+
+---
+
+#### 3. Core Web Vitals — `store-cwv.spec.ts`
+**Purpose:** Google's official user-experience metrics — the same signals Lighthouse and PageSpeed Insights report. Poor CWV scores affect Google search ranking.
+
+| Test | Metric | Threshold | What it measures |
+|---|---|---|---|
+| CWV-01 `@smoke` | **FCP** — First Contentful Paint | < 3000ms | How fast the first pixel appears |
+| CWV-02 | **DCL** — DOM Content Loaded | < 3000ms | How fast HTML is parsed and ready |
+| CWV-03 | **CLS** — Cumulative Layout Shift (interaction) | < 0.5 | Elements jumping during add-to-cart + cart open/close |
+| CWV-04 | Load event | < 3000ms | All 10 cards visible after full page load |
+| CWV-05 | CLS on add-to-cart | < 0.1 | Adding 10 items causes no layout shifts |
+| CWV-06 | **TBT** — Total Blocking Time | < 200ms | Scripts that freeze the UI > 50ms |
+| CWV-07 | Navigation wall-clock | < 5000ms | End-to-end load time as the user experiences it |
+| CWV-08 | CLS on cart animation | < 0.1 | Cart slide-in/out doesn't shift page content |
+
+> **Design note:** CWV-03 deliberately omits `buffered: true` in the PerformanceObserver. That flag replays page-load layout shifts during an interaction-only test, causing false positives. Only shifts triggered by user actions are measured.
+
+---
+
+#### 4. Security — `store-security.spec.ts`
+**Purpose:** Ensures the store cannot be used as an XSS attack vector and that sensitive data is not leaked through localStorage or external requests.
+
+| Test | What it checks |
+|---|---|
+| SEC-01 `@smoke` | No `eval()` call exists anywhere in the page JavaScript |
+| SEC-02 | Product names use `textContent`, never `innerHTML` (XSS guard) |
+| SEC-03 | No `document.write()` calls — classic injection vector |
+| SEC-04 | Cart data in localStorage contains only numeric IDs and quantities |
+| SEC-05 | Injecting `<script>alert(1)</script>` as a product name is rendered as text |
+| SEC-06 | No sensitive keys (`password`, `token`, `secret`) stored in localStorage |
+| SEC-07 `@smoke` | No external network requests made (page is fully self-contained) |
+| SEC-08 | Cart IDs are integers — no prototype pollution via string keys |
+| SEC-09 | Product names rendered in cart contain no script tags |
+| SEC-10 | Cart item HTML contains no injected script markup |
+| SEC-11 | No external `<script>` or `<link>` tags loaded from outside the file |
+| SEC-12 | Cart count badge always shows a non-negative integer |
+
+---
+
+#### 5. Accessibility — `store-a11y.spec.ts`
+**Purpose:** WCAG 2.1 AA compliance — the legal standard for web accessibility (required by ADA in the US, EN 301 549 in the EU). Covers both automated scanning and manual interaction tests that tools cannot automate.
+
+| Test | What it checks |
+|---|---|
+| AX-01 `@smoke` | Automated axe-core scan on page load — catches ~57% of WCAG violations |
+| AX-02 | Colour contrast ratio ≥ 4.5:1 on buttons (`#2563eb` blue, `#166534` green) |
+| AX-03 | Keyboard Tab navigation reaches the cart button (keyboard-only users) |
+| AX-04 | Cart items list has `role="list"` so screen readers announce item count |
+| AX-05 | `aria-label` on cart button updates live as items are added/removed |
+| AX-06 | Toast uses `aria-live="polite"` — screen readers announce "Item added" |
+| AX-07 | Cart sidebar has `role="dialog"` and `aria-modal="true"` |
+| AX-08 | Checkout button uses native `disabled` (correct — no ARIA workaround) |
+| AX-09 | Product emoji thumbnails have text equivalents in the DOM |
+| AX-10 | Full axe-core scan after items added to cart (state-aware re-scan) |
+| AX-11 | Opening cart moves focus to Close button (focus trap for keyboard users) |
+| AX-12 | Product grid has `aria-label`; all Add-to-Cart buttons are individually labelled |
+
+> **Why axe-core alone is not enough:** Automated tools catch structural violations but cannot test keyboard focus order, live region announcements, or focus trap behaviour. AX-03, AX-05, AX-06, and AX-11 are manual assertion tests for exactly this reason.
+
+---
+
+#### 6. Endurance Loops — `store-loop.spec.ts`
+**Purpose:** Runs the same operations hundreds of times in a loop to expose accuracy drift, memory leaks, CSS corruption, and idempotency failures that only appear after repeated use.
+
+| Test | Loop count | What it watches for |
+|---|---|---|
+| LOOP-01 | 30 cycles | Add/remove all 10 products — total always returns to $0.00 |
+| LOOP-02 | 50 clicks | `toggleCart()` — no CSS class corruption after rapid open/close |
+| LOOP-03 | 30 cycles | `addToCart()` for one product — quantity accumulates correctly |
+| LOOP-04 | 30 cycles | `removeItem()` — cart always ends at 0 items and $0.00 |
+| LOOP-05 | 30 cycles | `checkout()` — cart clears correctly every time |
+| LOOP-06 | 30 cycles | `changeQty(+1)` — quantity increments without drift |
+| LOOP-07 | 30 cycles | `changeQty(-1)` — item removed exactly when qty hits 0 |
+| LOOP-08 | 50 clicks | Button state — "Add to Cart" / "Added!" toggle, no stuck states |
+| LOOP-09 | 30 cycles | Toast appears and disappears correctly every time |
+| LOOP-10 `@smoke` | 1 pass | All 10 products added once — total equals $545.85 exactly |
+| LOOP-11 | 50 toggles | Cart CSS class stable — ends in correct open/closed state |
+| LOOP-12 | 3 full cycles | Add all → clear cart → repeat — cart fully reusable |
+
+---
+
+#### 7. State & Resilience — `store-network.spec.ts`
+**Purpose:** Verifies cart state durability under unexpected conditions — reloads, multiple tabs, corrupted storage. Answers the question: "Does the app hold together when things go wrong?"
+
+| Test | Scenario | What could break |
+|---|---|---|
+| NET-01 `@smoke` | Add items → reload → cart still present | localStorage not written or read on wrong key |
+| NET-02 | Same store in 2 separate browser contexts | Cross-context state leaking or colliding |
+| NET-03 | Corrupt localStorage with `{"x":"broken"}` → reload | App crashes instead of resetting gracefully |
+| NET-04 | Set localStorage to invalid JSON → reload | `JSON.parse()` throws, app never initialises |
+| NET-05 | Call `addToCart()` 10× in rapid succession | Race condition corrupts quantity or total |
+| NET-06 | Cart total matches expected value after reload | Floating-point math breaks across serialise/deserialise |
+| NET-07 | Remove all items → localStorage entry cleared | Stale key left behind; next session loads ghost items |
+| NET-08 | Manually delete localStorage → reload | App panics vs. starting fresh cleanly |
+
+---
+
+#### 8. Error / Edge Cases — `store-error.spec.ts`
+**Purpose:** Tests every guard condition and defensive code path — the scenarios the happy-path suite deliberately skips. These tests exist because two real bugs were found (and fixed) while writing them.
+
+| Test | Input | Expected behaviour |
+|---|---|---|
+| ERR-01 `@smoke` | `addToCart(999)` — unknown ID | No-op; cart stays at 0; no crash |
+| ERR-02 | `removeItem(99)` — ID never added | No-op; existing items unaffected |
+| ERR-03 | Double `removeItem()` on same ID | Second call is safe; no key-not-found error |
+| ERR-04 | `changeQty(999, +1)` — unknown ID | No NaN in total; cart stays at $0.00 |
+| ERR-05 | `changeQty(id, -100)` — massive decrement | Item removed; qty never goes negative |
+| ERR-06 | `changeQty` to exactly 0 | Item deleted from cart cleanly |
+| ERR-07 | `checkout()` on empty cart | No dialog fired; no crash |
+| ERR-08 | Double `checkout()` | Second call is no-op; cart stays empty |
+| ERR-09 | Add all 10 → remove all 10 | Total = $0.00; no NaN anywhere |
+| ERR-10 | Same product added 50× | Quantity = 50; total = unit price × 50; no Infinity |
+| ERR-11 | 4× `toggleCart()` (even count) | Cart ends closed; `aria-expanded="false"` |
+| ERR-12 | Add → checkout → add again | Cart fully reusable after purchase |
+
+> **Real bugs found:** `addToCart(unknownId)` previously crashed (undefined product lookup). `changeQty(unknownId, +1)` injected a `NaN` key into the cart total. Both are now guarded and tested.
+
+---
+
+#### 9. Visual Regression — `store-visual.spec.ts`
+**Purpose:** Takes pixel-level screenshots and diffs them against committed baseline PNGs (2% tolerance). Catches unintended UI changes — CSS regressions, layout shifts, broken states — that assertion tests cannot see.
+
+| Test | What is screenshotted |
+|---|---|
+| VR-01 `@smoke` | Full page — product grid in default state |
+| VR-02 | Header with cart button (0 items) |
+| VR-03 | Single product card (name, price, button) |
+| VR-04 | Add-to-Cart button in "Added!" (green) state |
+| VR-05 | Cart sidebar — empty state |
+| VR-06 | Cart sidebar — 3 items with quantities |
+| VR-07 | Cart total section with Checkout button enabled |
+| VR-08 | Toast notification displayed |
+| VR-09 | Cart count badge showing 5 items |
+| VR-10 | Quantity controls (−, qty, + buttons) |
+| VR-11 | Remove (🗑) button inside cart item |
+| VR-12 | Qty control for an item with qty = 3 |
+| VR-13 | Full page on mobile viewport (375px) |
+| VR-14 | Cart sidebar open on mobile viewport |
+
+Baselines are stored in `tests/e2e/__snapshots__/store-visual.spec.ts/` and committed to git. Regenerate after intentional UI changes:
 
 ```bash
 npx playwright test --config playwright.store.config.ts \
   tests/e2e/store-visual.spec.ts --update-snapshots
 ```
-
-Subsequent runs diff against committed PNGs in `tests/e2e/__snapshots__/store-visual.spec.ts/`.
 
 ### Load testing the store with k6
 
