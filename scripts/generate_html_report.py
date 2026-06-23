@@ -422,20 +422,24 @@ new Chart(document.getElementById('suiteChart'), {
       {
         label: 'Passed',
         data: DATA.suites.passed,
-        backgroundColor: DATA.suites.colors.map(c => c + 'bb'),
+        backgroundColor: DATA.suites.colors.map(c => c + 'cc'),
         borderColor: DATA.suites.colors,
         borderWidth: 1.5,
-        borderRadius: 4,
-        borderSkipped: false,
+        borderRadius: { topRight: 4, bottomRight: 4 },
+        borderSkipped: 'left',
+        barThickness: 18,
+        stack: 'suite',
       },
       {
         label: 'Failed',
         data: DATA.suites.failed,
-        backgroundColor: 'rgba(248,81,73,.7)',
+        backgroundColor: 'rgba(248,81,73,.75)',
         borderColor: '#f85149',
         borderWidth: 1.5,
-        borderRadius: 4,
-        borderSkipped: false,
+        borderRadius: { topRight: 4, bottomRight: 4 },
+        borderSkipped: 'left',
+        barThickness: 18,
+        stack: 'suite',
       }
     ]
   },
@@ -459,14 +463,20 @@ new Chart(document.getElementById('suiteChart'), {
     },
     scales: {
       x: {
-        stacked: false,
+        stacked: true,
         grid: { color: 'rgba(48,54,61,.5)' },
-        ticks: { stepSize: 5, color: '#8b949e' },
+        ticks: { stepSize: 5, color: '#8b949e', font: { size: 11 } },
         border: { color: '#30363d' },
       },
       y: {
+        stacked: true,
         grid: { display: false },
-        ticks: { font: { size: 12 }, color: '#c9d1d9' },
+        ticks: {
+          font: { size: 12 },
+          color: '#c9d1d9',
+          autoSkip: false,
+          maxRotation: 0,
+        },
         border: { color: '#30363d' },
       }
     }
@@ -993,12 +1003,14 @@ def generate(data: dict) -> str:
         '    </div>\n'
         '  </div>\n'
 
+        + (lambda n: (
         '  <div class="cc">\n'
         '    <h3>Tests by Suite</h3>\n'
-        '    <div class="chart-rel" style="height:210px">\n'
+        f'    <div class="chart-rel" style="height:{max(220, n * 52)}px">\n'
         '      <canvas id="suiteChart"></canvas>\n'
         '    </div>\n'
         '  </div>\n'
+        ))(len(so)) +
 
         '  <div class="cc">\n'
         '    <h3>By Browser</h3>\n'
