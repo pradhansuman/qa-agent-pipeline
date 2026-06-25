@@ -10,11 +10,21 @@ Usage:
 import json
 import argparse
 import sys
+import html as _html
 from datetime import datetime
 from pathlib import Path
 
+# Resolve Chart.js: prefer a local copy next to the script so the report is
+# self-contained and works from file:// without any CDN dependency.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_CHARTJS_LOCAL = _SCRIPT_DIR.parent / 'chart.umd.min.js'
+_CHARTJS_INLINE: str | None = None
+if _CHARTJS_LOCAL.exists():
+    _CHARTJS_INLINE = _CHARTJS_LOCAL.read_text(encoding='utf-8')
+
 # ── Suite display metadata ─────────────────────────────────────────────────────
 SUITE_META = {
+    # ShopNow Store suites
     'store-visual':   {'label': 'Visual Regression', 'icon': '🎨', 'color': '#10b981'},
     'store-api':      {'label': 'Contract / API',    'icon': '📋', 'color': '#3b82f6'},
     'store-security': {'label': 'Security',          'icon': '🔐', 'color': '#ef4444'},
@@ -24,6 +34,33 @@ SUITE_META = {
     'store-cwv':      {'label': 'Core Web Vitals',   'icon': '📊', 'color': '#a78bfa'},
     'store-network':  {'label': 'State Resilience',  'icon': '🔁', 'color': '#f97316'},
     'store-error':    {'label': 'Error / Edge Cases', 'icon': '⚠️',  'color': '#e11d48'},
+    # ChatConnect suites
+    'chatconnect-api':      {'label': 'Chat: Contract',     'icon': '📋', 'color': '#3b82f6'},
+    'chatconnect-ui':       {'label': 'Chat: UI',           'icon': '💬', 'color': '#8b5cf6'},
+    'chatconnect-security': {'label': 'Chat: Security',     'icon': '🔐', 'color': '#ef4444'},
+    'chatconnect-a11y':     {'label': 'Chat: A11y',         'icon': '♿', 'color': '#06b6d4'},
+    'chatconnect-cwv':      {'label': 'Chat: Web Vitals',   'icon': '📊', 'color': '#a78bfa'},
+    'chatconnect-perf':     {'label': 'Chat: Performance',  'icon': '⚡', 'color': '#f59e0b'},
+    'chatconnect-error':    {'label': 'Chat: Edge Cases',   'icon': '⚠️', 'color': '#e11d48'},
+    'chatconnect-visual':   {'label': 'Chat: Visual',       'icon': '🎨', 'color': '#10b981'},
+    # Amazon India Deals Tracker suites
+    'amazondeal-api':      {'label': 'Deals: Contract',    'icon': '📋', 'color': '#3b82f6'},
+    'amazondeal-ui':       {'label': 'Deals: UI',          'icon': '🖱️', 'color': '#8b5cf6'},
+    'amazondeal-security': {'label': 'Deals: Security',    'icon': '🔐', 'color': '#ef4444'},
+    'amazondeal-a11y':     {'label': 'Deals: A11y',        'icon': '♿', 'color': '#06b6d4'},
+    'amazondeal-cwv':      {'label': 'Deals: Web Vitals',  'icon': '📊', 'color': '#a78bfa'},
+    'amazondeal-perf':     {'label': 'Deals: Performance', 'icon': '⚡', 'color': '#f59e0b'},
+    'amazondeal-error':    {'label': 'Deals: Edge Cases',  'icon': '⚠️', 'color': '#e11d48'},
+    'amazondeal-visual':   {'label': 'Deals: Visual',      'icon': '🎨', 'color': '#10b981'},
+    # DemoApps User Management suites
+    'demoapps-api':      {'label': 'Demo: Contract',    'icon': '📋', 'color': '#3b82f6'},
+    'demoapps-ui':       {'label': 'Demo: UI',          'icon': '🖱️', 'color': '#8b5cf6'},
+    'demoapps-security': {'label': 'Demo: Security',    'icon': '🔐', 'color': '#ef4444'},
+    'demoapps-a11y':     {'label': 'Demo: A11y',        'icon': '♿', 'color': '#06b6d4'},
+    'demoapps-cwv':      {'label': 'Demo: Web Vitals',  'icon': '📊', 'color': '#a78bfa'},
+    'demoapps-perf':     {'label': 'Demo: Performance', 'icon': '⚡', 'color': '#f59e0b'},
+    'demoapps-error':    {'label': 'Demo: Edge Cases',  'icon': '⚠️', 'color': '#e11d48'},
+    'demoapps-visual':   {'label': 'Demo: Visual',      'icon': '🎨', 'color': '#10b981'},
 }
 
 DEFAULT_RESULTS      = Path('test-results-store/results.json')
@@ -39,18 +76,23 @@ TIER_META = {
 }
 
 
-def _load_history() -> list:
-    if HISTORY_FILE.exists():
+def _history_file_for(output_path: Path) -> Path:
+    """Derive the history JSON path from the report output path."""
+    return output_path.with_name(output_path.stem + '-history.json')
+
+
+def _load_history(history_file: Path) -> list:
+    if history_file.exists():
         try:
-            return json.loads(HISTORY_FILE.read_text(encoding='utf-8'))
+            return json.loads(history_file.read_text(encoding='utf-8'))
         except Exception:
             return []
     return []
 
 
-def _append_history(data: dict) -> list:
+def _append_history(data: dict, history_file: Path) -> list:
     """Append current run to history file, capped at HISTORY_MAX entries."""
-    runs = _load_history()
+    runs = _load_history(history_file)
     runs.append({
         'ts':     data['start_str'],
         'total':  data['total'],
@@ -61,7 +103,7 @@ def _append_history(data: dict) -> list:
         'dur':    data['dur_str'],
     })
     runs = runs[-HISTORY_MAX:]
-    HISTORY_FILE.write_text(json.dumps(runs, indent=2), encoding='utf-8')
+    history_file.write_text(json.dumps(runs, indent=2), encoding='utf-8')
     return runs
 
 
@@ -180,7 +222,8 @@ main { max-width: 1380px; margin: 0 auto; padding: 36px 40px; display: flex; fle
 .kpi-fail::before   { background: var(--fail); }
 .kpi-flaky::before  { background: var(--flaky); }
 .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
-.kpi-value { font-size: 44px; font-weight: 800; line-height: 1.1; margin: 6px 0 4px; }
+.kpi-value { font-size: 44px; font-weight: 800; line-height: 1.1; margin: 6px 0 4px; animation: kpi-pop .5s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes kpi-pop { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
 .kpi-total  .kpi-value { color: var(--hi); }
 .kpi-pass   .kpi-value { color: var(--pass); }
 .kpi-fail   .kpi-value { color: var(--fail); }
@@ -279,10 +322,12 @@ tr[data-status="flaky"]  td { background: rgba(210,153,34,.03); }
   align-items: center; justify-content: center; font-size: 11px;
   font-weight: 800; flex-shrink: 0;
 }
-.status-dot.passed  { background: rgba(63,185,80,.15);  color: var(--pass); }
-.status-dot.failed  { background: rgba(248,81,73,.15);  color: var(--fail); }
-.status-dot.flaky   { background: rgba(210,153,34,.15); color: var(--flaky); }
-.status-dot.skipped { background: rgba(139,148,158,.1); color: var(--skip); }
+.status-dot.passed   { background: rgba(63,185,80,.15);  color: var(--pass); }
+.status-dot.failed   { background: rgba(248,81,73,.15);  color: var(--fail); }
+.status-dot.flaky    { background: rgba(210,153,34,.15); color: var(--flaky); }
+.status-dot.skipped  { background: rgba(139,148,158,.1); color: var(--skip); }
+.status-dot.expected { background: rgba(249,115,22,.15); color: #f97316; }
+tr[data-status="expected"] td { background: rgba(249,115,22,.03); }
 
 .test-title { font-size: 12.5px; max-width: 480px; word-break: break-word; }
 .chip {
@@ -353,26 +398,10 @@ footer strong { color: var(--text); }
 
 # ── JavaScript ─────────────────────────────────────────────────────────────────
 JS = """
-// ── KPI counter animation ────────────────────────────────────────────────────
-function animateCount(id, target, delay) {
-  setTimeout(() => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const duration = 700;
-    const start = performance.now();
-    const tick = (now) => {
-      const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      el.textContent = Math.round(ease * target);
-      if (t < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, delay);
-}
-animateCount('kv-total', DATA.kpi.total, 100);
-animateCount('kv-pass',  DATA.kpi.passed, 200);
-animateCount('kv-fail',  DATA.kpi.failed, 200);
-animateCount('kv-flaky', DATA.kpi.flaky,  200);
+// KPI values are server-rendered — no JS needed to display them.
+// CSS transition provides a subtle scale-in effect on load.
+
+try {
 
 // ── Chart defaults ───────────────────────────────────────────────────────────
 Chart.defaults.color = '#8b949e';
@@ -426,8 +455,8 @@ new Chart(document.getElementById('suiteChart'), {
         backgroundColor: DATA.suites.colors.map(c => c + 'cc'),
         borderColor: DATA.suites.colors,
         borderWidth: 1.5,
-        borderRadius: { topRight: 4, bottomRight: 4 },
-        borderSkipped: 'left',
+        borderRadius: 4,
+        borderSkipped: false,
         barThickness: 18,
         stack: 'suite',
       },
@@ -437,8 +466,8 @@ new Chart(document.getElementById('suiteChart'), {
         backgroundColor: 'rgba(248,81,73,.75)',
         borderColor: '#f85149',
         borderWidth: 1.5,
-        borderRadius: { topRight: 4, bottomRight: 4 },
-        borderSkipped: 'left',
+        borderRadius: 4,
+        borderSkipped: false,
         barThickness: 18,
         stack: 'suite',
       }
@@ -565,6 +594,14 @@ if (document.getElementById('trendChart') && DATA.trend.labels.length >= 2) {
   });
 }
 
+} catch(e) {
+  console.warn('Chart.js rendering failed:', e);
+  const b = document.createElement('div');
+  b.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#f85149;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:9999;max-width:400px';
+  b.textContent = 'Chart error: ' + e.message;
+  document.body.appendChild(b);
+}
+
 // ── Table filter ─────────────────────────────────────────────────────────────
 function filterTable() {
   const q     = document.getElementById('srch').value.toLowerCase();
@@ -623,16 +660,22 @@ def _walk(suite: dict, file_key: str = '') -> list:
                 continue
             last  = results[-1]
             flaky = len(results) > 1 and last.get('status') == 'passed'
+            # test.fail() pattern: expectedStatus=="failed" + actual status=="failed" → known bug
+            expected_failure = (
+                test.get('expectedStatus') == 'failed'
+                and last.get('status') == 'failed'
+            )
             raw_title = spec.get('title', '')
             records.append({
-                'suite_key':   file_key,
-                'title':       raw_title,
-                'browser':     test.get('projectName', ''),
-                'status':      last.get('status', 'unknown'),
-                'duration_ms': last.get('duration', 0),
-                'flaky':       flaky,
-                'retries':     len(results) - 1,
-                'tier':        'smoke' if '@smoke' in raw_title else 'regression',
+                'suite_key':        file_key,
+                'title':            raw_title,
+                'browser':          test.get('projectName', ''),
+                'status':           last.get('status', 'unknown'),
+                'duration_ms':      last.get('duration', 0),
+                'flaky':            flaky,
+                'expected_failure': expected_failure,
+                'retries':          len(results) - 1,
+                'tier':             'smoke' if '@smoke' in raw_title else 'regression',
             })
     for child in suite.get('suites', []):
         records.extend(_walk(child, file_key))
@@ -652,13 +695,15 @@ def parse_results(json_path: Path) -> dict:
     for t in tests:
         k = t['suite_key']
         if k not in suite_data:
-            suite_data[k] = {'passed': 0, 'failed': 0, 'flaky': 0, 'total': 0, 'duration_ms': 0}
+            suite_data[k] = {'passed': 0, 'failed': 0, 'flaky': 0, 'skipped': 0, 'total': 0, 'duration_ms': 0}
         d = suite_data[k]
         d['total']       += 1
         d['duration_ms'] += t['duration_ms']
-        if t['flaky']:              d['flaky']  += 1
-        elif t['status'] == 'passed': d['passed'] += 1
-        else:                       d['failed'] += 1
+        ef = t.get('expected_failure', False)
+        if t['flaky']:                                    d['flaky']   += 1
+        elif t['status'] == 'skipped':                    d['skipped'] += 1
+        elif t['status'] == 'passed' or ef:               d['passed']  += 1
+        else:                                             d['failed']  += 1
 
     # Browser aggregation
     browser_data: dict = {}
@@ -668,21 +713,22 @@ def parse_results(json_path: Path) -> dict:
             browser_data[b] = {'passed': 0, 'failed': 0, 'total': 0}
         d = browser_data[b]
         d['total'] += 1
-        if t['status'] == 'passed': d['passed'] += 1
-        else:                       d['failed'] += 1
+        if t['status'] == 'passed' or t.get('expected_failure'): d['passed'] += 1
+        else:                                                     d['failed'] += 1
 
     # Tier aggregation (smoke vs regression from @smoke tag in title)
     tier_data: dict = {}
     for tier in ('smoke', 'regression'):
         tier_tests = [t for t in tests if t['tier'] == tier]
-        t_pass = sum(1 for t in tier_tests if t['status'] == 'passed' or t['flaky'])
-        t_fail = sum(1 for t in tier_tests if t['status'] not in ('passed', 'skipped') and not t['flaky'])
+        t_pass = sum(1 for t in tier_tests if t['status'] == 'passed' or t['flaky'] or t.get('expected_failure'))
+        t_fail = sum(1 for t in tier_tests if t['status'] not in ('passed', 'skipped') and not t['flaky'] and not t.get('expected_failure'))
         tier_data[tier] = {'total': len(tier_tests), 'passed': t_pass, 'failed': t_fail}
 
-    total  = len(tests)
-    passed = sum(1 for t in tests if t['status'] == 'passed' and not t['flaky'])
+    total             = len(tests)
+    expected_failures = sum(1 for t in tests if t.get('expected_failure'))
+    passed = sum(1 for t in tests if (t['status'] == 'passed' or t.get('expected_failure')) and not t['flaky'])
     flaky  = sum(1 for t in tests if t['flaky'])
-    failed = sum(1 for t in tests if t['status'] not in ('passed', 'skipped'))
+    failed = sum(1 for t in tests if t['status'] not in ('passed', 'skipped') and not t.get('expected_failure'))
 
     try:
         dt = datetime.fromisoformat(stats.get('startTime', '').replace('Z', '+00:00'))
@@ -696,18 +742,19 @@ def parse_results(json_path: Path) -> dict:
     pass_pct = round(100 * (passed + flaky) / total) if total else 0
 
     return {
-        'tests':        tests,
-        'suite_data':   suite_data,
-        'browser_data': browser_data,
-        'tier_data':    tier_data,
-        'total':        total,
-        'passed':       passed,
-        'failed':       failed,
-        'flaky':        flaky,
-        'pass_pct':     pass_pct,
-        'gate':         'PASS' if failed == 0 else 'FAIL',
-        'start_str':    start_str,
-        'dur_str':      dur_str,
+        'tests':             tests,
+        'suite_data':        suite_data,
+        'browser_data':      browser_data,
+        'tier_data':         tier_data,
+        'total':             total,
+        'passed':            passed,
+        'failed':            failed,
+        'flaky':             flaky,
+        'expected_failures': expected_failures,
+        'pass_pct':          pass_pct,
+        'gate':              'PASS' if failed == 0 else 'FAIL',
+        'start_str':         start_str,
+        'dur_str':           dur_str,
     }
 
 
@@ -717,18 +764,66 @@ def _ms(ms: int) -> str:
     return f'{ms / 1000:.1f}s' if ms >= 1000 else f'{ms}ms'
 
 
-def _status_cls(status: str, flaky: bool) -> str:
+def _status_cls(status: str, flaky: bool, expected_failure: bool = False) -> str:
     if flaky:               return 'flaky'
+    if expected_failure:    return 'expected'
     if status == 'passed':  return 'passed'
     if status == 'failed':  return 'failed'
     return 'skipped'
 
 
-def _status_icon(status: str, flaky: bool) -> str:
+def _status_icon(status: str, flaky: bool, expected_failure: bool = False) -> str:
     if flaky:               return '⚠'
+    if expected_failure:    return '✘'
     if status == 'passed':  return '✓'
     if status == 'failed':  return '✗'
     return '○'
+
+
+def _suite_meta(key: str) -> dict:
+    """Return display metadata for a suite key, with auto-derived fallback for unknown suites."""
+    if key in SUITE_META:
+        return SUITE_META[key]
+    # Auto-derive: "myapp-security" → label "Security", generic icon and color
+    FALLBACK_ICONS   = ['📋', '🖱️', '🔐', '♿', '📊', '⚡', '⚠️', '🎨', '🔁', '🧪']
+    FALLBACK_COLORS  = ['#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4',
+                        '#a78bfa', '#f59e0b', '#e11d48', '#10b981', '#f97316', '#6b7280']
+    parts = key.split('-')
+    suffix = parts[-1] if len(parts) > 1 else key
+    label  = suffix.replace('_', ' ').title()
+    # Stable index so color/icon are consistent across runs for the same suffix
+    idx = abs(hash(key)) % len(FALLBACK_ICONS)
+    return {'label': label, 'icon': FALLBACK_ICONS[idx], 'color': FALLBACK_COLORS[idx]}
+
+
+def _detect_app_prefix(so: list) -> str:
+    """Find the dominant app prefix from suite keys (e.g. 'amazondeal' from 'amazondeal-api')."""
+    if not so:
+        return ''
+    prefixes = [k.rsplit('-', 1)[0] if '-' in k else k for k in so]
+    # Most common prefix wins; ties broken alphabetically
+    from collections import Counter
+    dominant = Counter(prefixes).most_common(1)[0][0]
+    return dominant
+
+
+def _detect_app_title(so: list) -> str:
+    """Derive the app title from suite keys — no hardcoded app names needed."""
+    prefix = _detect_app_prefix(so)
+    if not prefix:
+        return 'QA Report'
+    # Known overrides for nicer names; everything else gets title-cased from its prefix
+    KNOWN = {
+        'store':        'ShopNow QA',
+        'amazondeal':   'Amazon Deals Tracker QA',
+        'chatconnect':  'ChatConnect QA',
+        'demoapps':     'DemoApps User Management QA',
+        'math-hub':     'Math Hub QA',
+    }
+    if prefix in KNOWN:
+        return KNOWN[prefix]
+    # Fallback: "my-new-app" → "My New App QA"
+    return prefix.replace('-', ' ').replace('_', ' ').title() + ' QA'
 
 
 def _run_label(so: list, tests: list) -> str:
@@ -741,12 +836,13 @@ def _run_label(so: list, tests: list) -> str:
         return 'Smoke Run'
     # Single suite — name it directly
     if n == 1:
-        return f'{SUITE_META.get(so[0], {}).get("label", so[0])} Run'
-    # Full suite — all known suites present
-    if set(so) >= set(SUITE_META.keys()):
+        return f'{_suite_meta(so[0])["label"]} Run'
+    # Full suite: all suites share the same app prefix
+    prefix = _detect_app_prefix(so)
+    if prefix and all(k.startswith(prefix + '-') for k in so):
         return 'Full Suite Run'
     # Partial run — list up to 2 suite names
-    labels = [SUITE_META.get(k, {'label': k})['label'] for k in so[:2]]
+    labels = [_suite_meta(k)['label'] for k in so[:2]]
     suffix = f' +{n - 2} more' if n > 2 else ''
     return ', '.join(labels) + suffix
 
@@ -757,11 +853,12 @@ def _suite_cards(suite_data: dict, order: list) -> str:
         if key not in suite_data:
             continue
         d    = suite_data[key]
-        meta = SUITE_META.get(key, {'label': key, 'icon': '🧪', 'color': '#6b7280'})
+        meta = _suite_meta(key)
         pct  = round(100 * (d['passed'] + d['flaky']) / d['total']) if d['total'] else 0
         avg  = d['duration_ms'] // d['total'] if d['total'] else 0
         c    = meta['color']
         fail_span = f'<span class="fail">✗ {d["failed"]} failed</span>' if d['failed'] else ''
+        skip_span = f'<span style="color:var(--muted)">⊘ {d["skipped"]} skipped</span>' if d.get('skipped') else ''
         parts.append(
             f'<div class="sc">'
             f'<div class="sc-hd">'
@@ -775,6 +872,7 @@ def _suite_cards(suite_data: dict, order: list) -> str:
             f'<span>{d["total"]} tests</span>'
             f'<span class="pass">✓ {d["passed"] + d["flaky"]} passed</span>'
             f'{fail_span}'
+            f'{skip_span}'
             f'<span style="color:var(--muted)">avg {_ms(avg)}</span>'
             f'</div>'
             f'</div>'
@@ -795,16 +893,18 @@ def _tier_chip(tier: str) -> str:
 def _test_rows(tests: list) -> str:
     rows = []
     for t in tests:
-        meta  = SUITE_META.get(t['suite_key'], {'label': t['suite_key'], 'icon': '🧪', 'color': '#6b7280'})
-        sc    = _status_cls(t['status'], t['flaky'])
-        icon  = _status_icon(t['status'], t['flaky'])
+        meta  = _suite_meta(t['suite_key'])
+        ef    = t.get('expected_failure', False)
+        sc    = _status_cls(t['status'], t['flaky'], ef)
+        icon  = _status_icon(t['status'], t['flaky'], ef)
         retry = '<span class="retry-badge">retry</span>' if t['retries'] else ''
+        bug   = '<span class="retry-badge" style="background:rgba(249,115,22,.2);color:#f97316">known bug</span>' if ef else ''
         tier  = t.get('tier', 'regression')
         rows.append(
             f'<tr data-suite="{t["suite_key"]}" data-browser="{t["browser"]}" '
             f'data-status="{sc}" data-tier="{tier}">'
             f'<td><span class="status-dot {sc}" title="{sc}">{icon}</span></td>'
-            f'<td class="test-title">{_clean_title(t["title"])}{retry}</td>'
+            f'<td class="test-title">{_html.escape(_clean_title(t["title"]))}{retry}{bug}</td>'
             f'<td>{_tier_chip(tier)}</td>'
             f'<td><span class="chip" style="border-color:{meta["color"]};color:{meta["color"]}">'
             f'{meta["icon"]} {meta["label"]}</span></td>'
@@ -835,7 +935,7 @@ def _unit_rows(unit_tests: list) -> str:
 
 # ── Main generator ─────────────────────────────────────────────────────────────
 
-def generate(data: dict) -> str:
+def generate(data: dict, app_title=None) -> str:
     # Suite ordering: follow SUITE_META order, then any extras
     so = [k for k in SUITE_META if k in data['suite_data']]
     so += [k for k in data['suite_data'] if k not in so]
@@ -846,6 +946,8 @@ def generate(data: dict) -> str:
 
     bd = data['browser_data']
     bl = list(bd.keys())
+
+    app_title = app_title or _detect_app_title(so)
 
     # Load run history (used in trend chart) — data['history'] injected by main()
     history = data.get('history', [])
@@ -864,8 +966,8 @@ def generate(data: dict) -> str:
             'flaky':  0,
         },
         'suites': {
-            'labels':  [SUITE_META.get(k, {'label': k})['label'] for k in so],
-            'colors':  [SUITE_META.get(k, {'color': '#6b7280'})['color'] for k in so],
+            'labels':  [_suite_meta(k)['label'] for k in so],
+            'colors':  [_suite_meta(k)['color'] for k in so],
             'passed':  [(data['suite_data'][k]['passed'] + data['suite_data'][k]['flaky']) for k in so],
             'failed':  [data['suite_data'][k]['failed'] for k in so],
         },
@@ -923,7 +1025,7 @@ def generate(data: dict) -> str:
 
     # Filter dropdown options
     suite_opts   = '\n'.join(
-        f'<option value="{k}">{SUITE_META.get(k, {"label":k})["label"]}</option>'
+        f'<option value="{k}">{_suite_meta(k)["label"]}</option>'
         for k in so
     )
     browser_opts = '\n'.join(f'<option value="{b}">{b}</option>' for b in bl)
@@ -938,9 +1040,12 @@ def generate(data: dict) -> str:
     fl    = data['flaky']
     pct   = data['pass_pct']
 
+    ef_count      = data.get('expected_failures', 0)
     kpi_sub_pass  = f'{pct}% pass rate'
     kpi_sub_fail  = 'All clear ✓' if f_ == 0 else f'{f_} need attention'
-    kpi_sub_flaky = 'Zero flakiness ✓' if fl == 0 else f'Passed on retry'
+    kpi_sub_flaky = ('Zero flakiness ✓' if fl == 0 else 'Passed on retry') + (
+        f'  ·  🐛 {ef_count} known bugs' if ef_count else ''
+    )
 
     html = (
         '<!DOCTYPE html>\n'
@@ -948,8 +1053,11 @@ def generate(data: dict) -> str:
         '<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        f'<title>ShopNow QA — {run_label} — {data["gate"]}</title>\n'
-        '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>\n'
+        f'<title>{app_title} — {run_label} — {data["gate"]}</title>\n'
+        # Inline chart.js for self-contained file:// compatibility; CDN fallback if missing
+        + (f'<script>{_CHARTJS_INLINE}</script>\n' if _CHARTJS_INLINE
+           else '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>\n')
+        +
         '<style>\n' + CSS + '\n</style>\n'
         '</head>\n'
         '<body>\n'
@@ -960,7 +1068,7 @@ def generate(data: dict) -> str:
         '    <div class="brand">\n'
         '      <div class="brand-icon">🧪</div>\n'
         '      <div>\n'
-        f'        <h1>ShopNow QA — {run_label}</h1>\n'
+        f'        <h1>{app_title} — {run_label}</h1>\n'
         f'        <div class="run-meta">{data["start_str"]} &nbsp;·&nbsp; {data["dur_str"]}</div>\n'
         '      </div>\n'
         '    </div>\n'
@@ -983,25 +1091,25 @@ def generate(data: dict) -> str:
         '<div class="kpi-grid">\n'
         '  <div class="kpi kpi-total">\n'
         '    <div class="kpi-label">Total Tests</div>\n'
-        '    <div class="kpi-value" id="kv-total">0</div>\n'
+        f'    <div class="kpi-value" id="kv-total">{data["total"]}</div>\n'
         f'    <div class="kpi-sub">across {suite_count_label} · {browser_count_label}</div>\n'
         '    <div class="kpi-icon">🧪</div>\n'
         '  </div>\n'
         '  <div class="kpi kpi-pass">\n'
         '    <div class="kpi-label">Passed</div>\n'
-        '    <div class="kpi-value" id="kv-pass">0</div>\n'
+        f'    <div class="kpi-value" id="kv-pass">{data["passed"]}</div>\n'
         f'    <div class="kpi-sub">{kpi_sub_pass}</div>\n'
         '    <div class="kpi-icon">✓</div>\n'
         '  </div>\n'
         '  <div class="kpi kpi-fail">\n'
         '    <div class="kpi-label">Failed</div>\n'
-        '    <div class="kpi-value" id="kv-fail">0</div>\n'
+        f'    <div class="kpi-value" id="kv-fail">{data["failed"]}</div>\n'
         f'    <div class="kpi-sub">{kpi_sub_fail}</div>\n'
         '    <div class="kpi-icon">✗</div>\n'
         '  </div>\n'
         '  <div class="kpi kpi-flaky">\n'
         '    <div class="kpi-label">Flaky</div>\n'
-        '    <div class="kpi-value" id="kv-flaky">0</div>\n'
+        f'    <div class="kpi-value" id="kv-flaky">{data["flaky"]}</div>\n'
         f'    <div class="kpi-sub">{kpi_sub_flaky}</div>\n'
         '    <div class="kpi-icon">⚠</div>\n'
         '  </div>\n'
@@ -1093,6 +1201,7 @@ def generate(data: dict) -> str:
         '      <option value="passed">Passed</option>\n'
         '      <option value="failed">Failed</option>\n'
         '      <option value="flaky">Flaky</option>\n'
+        '      <option value="expected">Known Bug</option>\n'
         '    </select>\n'
         '    <select id="tfilt" onchange="filterTable()">\n'
         '      <option value="">All Tiers</option>\n'
@@ -1141,7 +1250,7 @@ def generate(data: dict) -> str:
 
         # ─── Footer ─────────────────────────────────────────────────────
         '<footer>\n'
-        f'<p>Generated by <strong>zero-to-test-ai</strong> · ShopNow Store QA Suite · {data["start_str"]}</p>\n'
+        f'<p>Generated by <strong>zero-to-test-ai</strong> · {app_title} · {data["start_str"]}</p>\n'
         '</footer>\n'
 
         # ─── Data injection ──────────────────────────────────────────────
@@ -1173,34 +1282,38 @@ def main() -> None:
         help=f'Output HTML path (default: {DEFAULT_OUTPUT})',
     )
     ap.add_argument(
-        '--unit-results', type=Path, default=DEFAULT_UNIT_RESULTS,
-        help=f'Path to pytest-json-report output (default: {DEFAULT_UNIT_RESULTS})',
+        '--unit-results', type=Path, default=None,
+        help='Path to pytest-json-report output (auto-detected for store suite; omit for other apps)',
+    )
+    ap.add_argument(
+        '--title', type=str, default=None,
+        help='Override the app title shown in the report header (auto-detected by default)',
     )
     args = ap.parse_args()
 
     if not args.results.exists():
         print(f'Error: results file not found: {args.results}', file=sys.stderr)
-        print('Run first:  npx playwright test --config playwright.store.config.ts', file=sys.stderr)
+        print('Run first:  npx playwright test --config <your-config>.ts', file=sys.stderr)
         sys.exit(1)
 
     print(f'Parsing {args.results} …')
     data = parse_results(args.results)
 
-    # Parse unit test results (optional — skipped gracefully if file absent)
-    unit = parse_unit_results(args.unit_results)
+    # Unit results: only included when explicitly passed via --unit-results
+    unit = parse_unit_results(args.unit_results) if args.unit_results else \
+           {'tests': [], 'total': 0, 'passed': 0, 'failed': 0, 'dur_str': '—'}
     data['unit'] = unit
     if unit['total']:
         print(f'Unit tests: {unit["passed"]}/{unit["total"]} passed  ({args.unit_results})')
-    else:
-        print(f'Unit results not found at {args.unit_results} — unit section will be hidden')
 
-    # Persist this run to the rolling history file, then embed it in the report
-    history = _append_history(data)
+    # Each app gets its own history file derived from the output filename
+    history_file = _history_file_for(args.output)
+    history = _append_history(data, history_file)
     data['history'] = history
-    print(f'History: {len(history)} run(s) tracked in {HISTORY_FILE}')
+    print(f'History: {len(history)} run(s) tracked in {history_file}')
 
     print(f'Building report ({data["total"]} E2E tests, {data["pass_pct"]}% pass rate) …')
-    html = generate(data)
+    html = generate(data, app_title=args.title)
 
     args.output.write_text(html, encoding='utf-8')
     print(f'✓  Report written → {args.output}')

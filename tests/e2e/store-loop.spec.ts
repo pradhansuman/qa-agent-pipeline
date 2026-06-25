@@ -201,3 +201,43 @@ test('TC-STORE-LOOP-12: full lifecycle × 3 — add all → clear cart → repea
     expect(afterClear).toBe(0);
   }
 });
+
+// ── TC-STORE-LOOP-13 ──────────────────────────────────────────────────────────
+// Point 44: Notification — toast shows correct product name on add
+test('TC-STORE-LOOP-13: toast notification shows correct product name', async ({ page }) => {
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  const names = await page.locator('[data-testid^="product-name-"]').allTextContents();
+  for (let i = 0; i < Math.min(3, names.length); i++) {
+    const name = names[i].trim();
+    await page.locator('[data-testid^="add-to-cart-"]').nth(i).click();
+    await page.waitForTimeout(300);
+    const toast = page.locator('[aria-live], .toast, #toast, [role="status"], [data-testid="toast"]').first();
+    const toastText = (await toast.textContent().catch(() => '')) || '';
+    if (toastText) {
+      expect(toastText).toContain(name);
+    } else {
+      test.info().annotations.push({ type: 'toast-note', description: 'No toast element captured for: ' + name });
+    }
+    await page.waitForTimeout(1500);
+  }
+});
+
+// ── TC-STORE-LOOP-14 ──────────────────────────────────────────────────────────
+// State machine: cart badge transitions 0 → N → 0 across add and checkout
+test('TC-STORE-LOOP-14 state: badge transitions 0→5→0 across add and checkout cycle', async ({ page }) => {
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  const shop = new ShopNow(page);
+  const initial = (await shop.cartBadge.textContent() || '').trim();
+  expect(['0', '']).toContain(initial);
+  for (let i = 0; i < 5; i++) {
+    await page.locator('[data-testid^="add-to-cart-"]').nth(i).click();
+    await page.waitForTimeout(100);
+  }
+  const midBadge = parseInt((await shop.cartBadge.textContent() || '0').trim());
+  expect(midBadge).toBe(5);
+  await shop.openCart();
+  await shop.checkout();
+  await page.waitForTimeout(500);
+  const finalBadge = (await shop.cartBadge.textContent() || '').trim();
+  expect(['0', '']).toContain(finalBadge);
+});

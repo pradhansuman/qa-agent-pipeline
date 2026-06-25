@@ -27,19 +27,22 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 try:
-    import anthropic
+    from openai import OpenAI, APIError as _APIError
 except ImportError:
-    sys.exit("Run: pip install anthropic")
+    sys.exit("Run: pip install openai")
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-MODEL   = os.environ.get("QA_AGENT_MODEL", "claude-haiku-4-5-20251001")
+MODEL   = os.environ.get("QA_AGENT_MODEL", "anthropic/claude-haiku-4.5")
 MAX_TOK = 600          # tokens per agent response
 WIDTH   = 72           # terminal wrap width
 
-client  = anthropic.Anthropic()   # reads ANTHROPIC_API_KEY from environment
+client  = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -184,13 +187,15 @@ def _call(agent: Agent, user_question: str, history: list[Turn]) -> str:
 
     lines.append(f"\nIt is now your turn as the {agent.name}. Respond.")
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model      = MODEL,
         max_tokens = MAX_TOK,
-        system     = agent.system,
-        messages   = [{"role": "user", "content": "\n".join(lines)}],
+        messages   = [
+            {"role": "system", "content": agent.system},
+            {"role": "user",   "content": "\n".join(lines)},
+        ],
     )
-    return response.content[0].text.strip()
+    return (response.choices[0].message.content or "").strip()
 
 
 def _print_turn(turn: Turn) -> None:
@@ -407,10 +412,10 @@ def deliberate_demo(user_question: str) -> None:
 def main() -> None:
     demo_mode = "--demo" in sys.argv
 
-    if not demo_mode and not os.environ.get("ANTHROPIC_API_KEY"):
+    if not demo_mode and not os.environ.get("OPENROUTER_API_KEY"):
         sys.exit(
-            "Set ANTHROPIC_API_KEY first:\n"
-            "  export ANTHROPIC_API_KEY=sk-ant-...\n\n"
+            "Set OPENROUTER_API_KEY first:\n"
+            "  export OPENROUTER_API_KEY=sk-or-v1-...\n\n"
             "Or run a demo (no key needed):\n"
             "  python3 council.py --demo"
         )
@@ -446,7 +451,7 @@ def main() -> None:
                 deliberate_demo(question)
             else:
                 deliberate(question)
-        except anthropic.APIError as exc:
+        except _APIError as exc:
             print(f"\n❌  API error: {exc}\n")
 
 

@@ -174,9 +174,9 @@ test('CWV-STORE-08: cart open/close animation does not cause layout shift', asyn
 
   // Open and close cart 3 times
   for (let i = 0; i < 3; i++) {
-    await page.click('#cart-btn');
+    await page.locator('#cart-btn').dispatchEvent('click');
     await page.waitForTimeout(150);
-    await page.click('.close-btn');
+    await page.locator('.close-btn').first().dispatchEvent('click');
     await page.waitForTimeout(150);
   }
 

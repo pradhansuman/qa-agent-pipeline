@@ -201,3 +201,81 @@ test('ERR-STORE-12: add → checkout → add again works correctly — cart is n
   expect(await page.locator('#cart-total').textContent()).not.toBe('$0.00');
   expect(await page.locator('#cart-total').textContent()).not.toContain('NaN');
 });
+
+// ── ERR-STORE-13 ──────────────────────────────────────────────────────────────
+// BVA min: decrement from qty 1 removes item — count never goes below 0
+test('ERR-STORE-13 BVA-min: decrement from qty 1 removes item completely', async ({ page }) => {
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  const shop = new ShopNow(page);
+  await shop.addToCart(0);
+  await shop.openCart();
+  expect(await shop.cartItems.count()).toBe(1);
+  // Click the qty-decrease (or first button in cart item)
+  await page.locator('.cart-item').first().locator('button').first().click();
+  await page.waitForTimeout(500);
+  expect(await shop.cartItems.count()).toBe(0);
+  const badge = (await shop.cartBadge.textContent() || '').trim();
+  expect(['0', '']).toContain(badge);
+});
+
+// ── ERR-STORE-14 ──────────────────────────────────────────────────────────────
+// BVA max: 100 increments via JS — total must stay a valid finite number
+test('ERR-STORE-14 BVA-max: qty incremented 100x keeps a finite, valid total', async ({ page }) => {
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  const shop = new ShopNow(page);
+  await shop.addToCart(0);
+  await page.evaluate(() => {
+    const id = (window as any).cart?.[0]?.id;
+    if (!id) return;
+    for (let i = 0; i < 99; i++) (window as any).changeQty(id, 1);
+    if ((window as any).updateCartUI) (window as any).updateCartUI();
+    else if ((window as any).renderCart) (window as any).renderCart();
+  });
+  await shop.openCart();
+  await page.waitForTimeout(400);
+  const totalText = (await shop.cartTotal.textContent() || '').replace(/[^0-9.]/g, '');
+  const totalNum = parseFloat(totalText);
+  expect(isNaN(totalNum)).toBe(false);
+  expect(isFinite(totalNum)).toBe(true);
+  expect(totalNum).toBeGreaterThan(0);
+});
+
+// ── ERR-STORE-15 ──────────────────────────────────────────────────────────────
+// Decision table: checkout cycle × 2 — each cycle starts and ends clean
+test('ERR-STORE-15 decision: two full checkout cycles each leave cart empty', async ({ page }) => {
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  const shop = new ShopNow(page);
+  for (let cycle = 1; cycle <= 2; cycle++) {
+    await shop.addToCart(0);
+    await shop.addToCart(1);
+    await shop.openCart();
+    await shop.checkout();
+    await page.waitForTimeout(600);
+    const badge = (await shop.cartBadge.textContent() || '').trim();
+    expect(['0', '']).toContain(badge);
+    const total = (await shop.cartTotal.textContent() || '');
+    expect(total).toMatch(/\$0\.00|\$0/);
+  }
+});
+
+// ── ERR-STORE-16 ──────────────────────────────────────────────────────────────
+// Pairwise: 4 product × quantity pairs — total price matches unit × qty
+for (const { idx, qty } of [{ idx: 0, qty: 1 }, { idx: 4, qty: 3 }, { idx: 9, qty: 2 }, { idx: 2, qty: 5 }]) {
+  test('ERR-STORE-16 pairwise: product[' + idx + '] × qty ' + qty + ' total is accurate', async ({ page }) => {
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+    const shop = new ShopNow(page);
+    const priceText = (await page.locator('[data-testid^="product-price-"]').nth(idx).textContent() || '0');
+    const unitPrice = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+    // Add qty times
+    for (let i = 0; i < qty; i++) {
+      await page.locator('[data-testid^="add-to-cart-"]').nth(idx).click();
+      await page.waitForTimeout(100);
+    }
+    await shop.openCart();
+    await page.waitForTimeout(300);
+    const totalText = (await shop.cartTotal.textContent() || '').replace(/[^0-9.]/g, '');
+    const totalNum = parseFloat(totalText);
+    const expected = Math.round(unitPrice * qty * 100) / 100;
+    expect(Math.abs(totalNum - expected)).toBeLessThan(0.02);
+  });
+}

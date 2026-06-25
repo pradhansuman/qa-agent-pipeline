@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Type, TypeVar
 
-from anthropic import Anthropic
+from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 
 from contracts.exceptions import LLMError, TruncatedResponseError
@@ -72,11 +72,14 @@ class Agent:
 
     def __init__(
         self,
-        client:   Anthropic | None = None,
+        client:   OpenAI | None = None,
         model:    str = settings.qa_agent_model,
         trace_id: str | None = None,
     ):
-        self.client   = client or Anthropic()
+        self.client   = client or OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.openrouter_api_key,
+        )
         self.model    = model
         self.trace_id = trace_id or "--------"
         self.usage    = TokenUsage()
@@ -108,21 +111,29 @@ class Agent:
     # ── Core LLM call ─────────────────────────────────────────────────────────
     def _complete(self, user_prompt: str, max_tokens: int = 1500) -> tuple[str, str]:
         """Returns (text, stop_reason). Accumulates token usage."""
-        resp = self.client.messages.create(
+        resp = self.client.chat.completions.create(
             model=self.model,
             max_tokens=max_tokens,
             temperature=0,
-            system=self._get_system(),
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[
+                {"role": "system", "content": self._get_system()},
+                {"role": "user",   "content": user_prompt},
+            ],
         )
-        self.usage.input_tokens  += resp.usage.input_tokens
-        self.usage.output_tokens += resp.usage.output_tokens
+        usage = resp.usage
+        if usage:
+            self.usage.input_tokens  += usage.prompt_tokens
+            self.usage.output_tokens += usage.completion_tokens
+        choice = resp.choices[0]
+        stop = "max_tokens" if choice.finish_reason == "length" else choice.finish_reason
         self.log.debug(
             "trace=%s llm_call in=%d out=%d stop=%s",
-            self.trace_id, resp.usage.input_tokens,
-            resp.usage.output_tokens, resp.stop_reason,
+            self.trace_id,
+            usage.prompt_tokens  if usage else 0,
+            usage.completion_tokens if usage else 0,
+            stop,
         )
-        return resp.content[0].text, resp.stop_reason
+        return choice.message.content or "", stop
 
     # ── JSON extraction ───────────────────────────────────────────────────────
     @staticmethod

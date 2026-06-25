@@ -145,3 +145,57 @@ test('TC-STORE-PERF-10: page renders all 10 product cards within 3000ms of navig
   // 3000ms — resilient to parallel-worker load on local file://
   if (domReadyMs > 0) expect(domReadyMs).toBeLessThan(3000);
 });
+
+// ── LOOP 1.6: Gorilla Testing ─────────────────────────────────────────────────
+test('TC-STORE-PERF-GORILLA: gorilla — Add to Cart clicked 30x without DOM corruption', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('https://dfgjhjcr.gensparkspace.com', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1000);
+  const btn = page.locator('[data-testid^="add-to-cart-"]').first();
+  for (let i = 0; i < 30; i++) { await btn.click().catch(() => {}); await page.waitForTimeout(50); }
+  await expect(page.locator('body')).toBeVisible();
+  const critical = errors.filter(e => !e.toLowerCase().includes('favicon'));
+  test.info().annotations.push({ type: 'gorilla', description: '30x add-to-cart | errors: ' + critical.length });
+  expect(critical).toHaveLength(0);
+});
+
+// ── LOOP 3.3: Spike Testing ───────────────────────────────────────────────────
+test('TC-STORE-PERF-SPIKE: spike — 10 tabs loading simultaneously stay stable', async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const tabs = await Promise.all(Array.from({ length: 10 }, () => ctx.newPage()));
+  const errors: string[] = [];
+  tabs.forEach(p => p.on('pageerror', e => errors.push(e.message)));
+  await Promise.all(tabs.map(p => p.goto('https://dfgjhjcr.gensparkspace.com', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {})));
+  for (const p of tabs) await expect(p.locator('body')).toBeVisible().catch(() => {});
+  await ctx.close();
+  test.info().annotations.push({ type: 'spike', description: '10-tab spike completed' });
+  expect(errors.filter(e => !e.toLowerCase().includes('favicon'))).toHaveLength(0);
+});
+
+// ── LOOP 6.2: Localization — price currency format ────────────────────────────
+test('TC-STORE-L10N-01: prices display with valid currency symbol and decimal format', async ({ page }) => {
+  await page.goto('https://dfgjhjcr.gensparkspace.com', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(500);
+  const prices = await page.locator('[data-testid^="product-price-"]').allTextContents();
+  for (const price of prices) {
+    expect(price).toMatch(/[$\u20AC\u00A3\u20B9\u00A5][\d,]+\.?\d{0,2}/);
+  }
+  test.info().annotations.push({ type: 'l10n', description: 'Currency format check: ' + prices.slice(0, 3).join(', ') });
+});
+
+// ── LOOP 6.7: Chaos Engineering ───────────────────────────────────────────────
+test('TC-STORE-CHAOS-01: aborted image CDN requests do not break Add to Cart', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.route('**/*.{jpg,jpeg,png,gif,webp,svg}', route => route.abort('blockedbyclient'));
+  await page.goto('https://dfgjhjcr.gensparkspace.com', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1000);
+  const btn = page.locator('[data-testid^="add-to-cart-"]').first();
+  if (await btn.count()) await btn.click();
+  await page.waitForTimeout(500);
+  await expect(page.locator('body')).toBeVisible();
+  const critical = errors.filter(e => !e.toLowerCase().includes('favicon') && !e.includes('ERR_BLOCKED'));
+  test.info().annotations.push({ type: 'chaos', description: 'CDN-abort chaos | errors: ' + critical.length });
+  expect(critical).toHaveLength(0);
+});

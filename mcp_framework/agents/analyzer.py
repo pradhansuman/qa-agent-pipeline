@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from anthropic import Anthropic
+from openai import OpenAI
 from agents.base import Agent            # reuse existing base
 from mcp_framework.contracts import (
     PRDInput, PRDAnalysis, AppFeature,
@@ -93,7 +93,7 @@ class AnalyzerAgent(Agent):
     SYSTEM = "You are a Senior QA Architect. Output only valid JSON."
 
     def __init__(self, model: str):
-        super().__init__(client=Anthropic(), model=model)
+        super().__init__(client=OpenAI(base_url="https://openrouter.ai/api/v1", api_key=__import__("os").environ.get("OPENROUTER_API_KEY","")), model=model)
 
     # ── public API ────────────────────────────────────────────────────────
     def analyze(self, inp: PRDInput) -> PRDAnalysis:

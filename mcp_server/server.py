@@ -14,7 +14,7 @@ Registration (Claude desktop — claude_desktop_config.json):
       "qa-pipeline": {
         "command": "python",
         "args": ["/path/to/QA_AGents/mcp_server/server.py"],
-        "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+        "env": { "OPENROUTER_API_KEY": "sk-or-v1-..." }
       }
     }
   }

@@ -14,13 +14,16 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+load_dotenv()  # reads .env from cwd or any parent directory
 
 
 @dataclass(frozen=True)
 class Settings:
     # ── LLM ─────────────────────────────────────────────────────────────────
-    anthropic_api_key: str         = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
-    qa_agent_model: str            = field(default_factory=lambda: os.environ.get("QA_AGENT_MODEL", "claude-haiku-4-5-20251001"))
+    openrouter_api_key: str        = field(default_factory=lambda: os.environ.get("OPENROUTER_API_KEY", ""))
+    qa_agent_model: str            = field(default_factory=lambda: os.environ.get("QA_AGENT_MODEL", "anthropic/claude-haiku-4.5"))
 
     # ── Target app ───────────────────────────────────────────────────────────
     qa_target_url: str             = field(default_factory=lambda: os.environ.get("QA_TARGET_URL", "https://demoqa.com"))

@@ -40,7 +40,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from anthropic import Anthropic
+from openai import OpenAI
 
 from contracts.schemas import (
     IssueRef, IssuePayload, TestPlan, GeneratedSuite, RunResults, ReportArtifact,
@@ -71,16 +71,14 @@ class PipelineTrace:
 
 
 class QAPipeline:
-    def __init__(self, real_run: bool = False, client: Anthropic | None = None,
+    def __init__(self, real_run: bool = False, client: OpenAI | None = None,
                  self_heal: bool = True, review: bool = True, sdet: bool = False,
                  demo: bool = False, offline: bool = False):
         # in demo mode we don't need a real key — use a dummy client so the
         # SDK constructs, then stubs replace every call before it's used.
         if client is None:
-            if demo:
-                client = Anthropic(api_key="demo-no-key-needed")
-            else:
-                client = Anthropic()
+            _key = "demo-no-key-needed" if demo else os.environ.get("OPENROUTER_API_KEY", "")
+            client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=_key)
         self.ingestor   = IngestorAgent()
         self.strategist = StrategistAgent(client=client)
         self.designer   = TestDesignerAgent(client=client) if sdet else None

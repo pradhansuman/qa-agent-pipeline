@@ -4,6 +4,7 @@ import path from 'path';
 export const STORE_URL = `file://${path.resolve(__dirname, 'store.html')}`;
 
 export default defineConfig({
+  globalTeardown: './scripts/auto-report',
   testDir: './tests/e2e',
   testMatch: ['store-*.spec.ts'],
   fullyParallel: true,

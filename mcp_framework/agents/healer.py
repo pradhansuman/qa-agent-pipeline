@@ -16,7 +16,7 @@ import os, re, sys, subprocess
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from anthropic import Anthropic
+from openai import OpenAI
 from agents.base import Agent
 from mcp_framework.contracts import (
     ExecutionResult, TestCaseResult, HealAttempt, FailureKind,
@@ -61,7 +61,7 @@ class HealerAgent(Agent):
     SYSTEM = "You are a Playwright self-healing engineer. Output only valid JSON."
 
     def __init__(self, cfg: MCPConfig):
-        super().__init__(client=Anthropic(), model=cfg.model)
+        super().__init__(client=OpenAI(base_url="https://openrouter.ai/api/v1", api_key=__import__("os").environ.get("OPENROUTER_API_KEY","")), model=cfg.model)
         self.cfg = cfg
 
     # ── public API ────────────────────────────────────────────────────────

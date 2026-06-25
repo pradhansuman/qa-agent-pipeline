@@ -70,6 +70,46 @@ The model is controlled by the `QA_AGENT_MODEL` environment variable (default: `
 
 Triggers on `issues: [labeled]` when label is `qa-ready`. Runs inside the official Playwright Docker image (`mcr.microsoft.com/playwright:v1.44.0-jammy`). The gate decision is surfaced as a job output (`gate=pass|fail`) and `exit 1` enforces it. Allure results are published to GitHub Pages via `simple-elf/allure-report-action`.
 
+## Reusable QA Strategy Framework
+
+### Shared utilities (`tests/e2e/shared/strategy.ts`)
+
+A project-agnostic TypeScript library implementing the 8-Loop / 100-Point QA framework. Import in any spec file:
+
+```typescript
+import { BVA, EP, pairwiseCombos, MonkeyPayloads, SecurityPayloads,
+         L10nPayloads, QAAnnotate, PerfThresholds, CommonRisks, CoverageMap }
+  from '../shared/strategy';
+```
+
+Key exports: `BVA` (boundary value sets), `EP` (equivalence partition datasets), `pairwiseCombos(dims)`, `MonkeyPayloads` (16 edge-case inputs), `SecurityPayloads` (XSS/SQL/CSRF), `L10nPayloads` (RTL Arabic, CJK, currency/date formats), `QAAnnotate` (16-type annotation helpers), `PerfThresholds` (CWV budgets + `GorillaHits 30`, `SpikeCount 50`), `CommonRisks` (11 named risk constants), `CoverageMap` (loop ID → spec pattern).
+
+### Suite scaffolder (`scripts/scaffold-suite.py`)
+
+Generates a complete 8-spec QA suite for any project in one command:
+
+```bash
+python3 scripts/scaffold-suite.py --url https://myapp.com --prefix myapp
+python3 scripts/scaffold-suite.py --url https://myapp.com --prefix myapp --auth  # with login
+```
+
+Generates 8 spec files + `playwright.<prefix>.config.ts` + npm scripts (`test:<prefix>`, `test:<prefix>:smoke`, `test:<prefix>:baselines`). After scaffolding, search for `// TODO:` comments to wire up app-specific selectors.
+
+### 8-Loop coverage
+
+| Loop | Playwright spec | External tool |
+|---|---|---|
+| 1.1 Smoke | all `@smoke` | — |
+| 1.5 Monkey / 1.6 Gorilla | `-error.spec.ts`, `-perf.spec.ts` | — |
+| 2.1 BVA / 2.2 EP / 2.5 Pairwise | `-api.spec.ts`, `-ui.spec.ts` | — |
+| 3.1/3.2 Load/Stress | — | k6 / Artillery |
+| 3.3 Spike | `-perf.spec.ts` | — |
+| 4.5 API / 4.6 E2E | `-api.spec.ts`, `-ui.spec.ts` | — |
+| 5.x Security | `-security.spec.ts` | Burp Suite (pen-test) |
+| 6.1 A11Y | `-a11y.spec.ts` | — |
+| 6.2 L10n / 6.7 Chaos | `-error.spec.ts` | — |
+| 7.x Visual | `-visual.spec.ts` | — |
+
 ## Store UI (`store.html`)
 
 A standalone dark-mode HTML/CSS/JS storefront (no build step, open directly in a browser). It displays 10 products in a responsive grid with an emoji thumbnail, price, and "Add to Cart" button. A slide-in cart sidebar handles quantity controls, item removal, a running total, and a checkout confirmation. All state is in-memory (page reload resets the cart). No backend — intended as a demo UI only.

@@ -8,7 +8,7 @@ Usage:
       --name ShopNow --out ./qa-shopnow --workers 2
 
 Environment variables (all optional):
-  ANTHROPIC_API_KEY   Required for LLM agents
+  OPENROUTER_API_KEY  Required for LLM agents
   GITHUB_TOKEN        GitHub PR creation
   GITHUB_REPO         owner/repo for the PR
   JIRA_URL            Jira base URL
@@ -168,8 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.no_slack:
         cfg.slack_webhook = None
 
-    if not cfg.anthropic_api_key:
-        print(R("Error: ANTHROPIC_API_KEY is not set."))
+    if not cfg.openrouter_api_key:
+        print(R("Error: OPENROUTER_API_KEY is not set."))
         return 1
 
     # ── print header ─────────────────────────────────────────────────────

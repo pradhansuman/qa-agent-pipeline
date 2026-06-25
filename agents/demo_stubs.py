@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from contracts.schemas import (
     IssuePayload, TestPlan, TestScenario, GeneratedSuite, GeneratedFile,
-    Priority, TestType, RiskLevel,
+    Priority, TestType, RiskLevel, ReviewReport, DimensionScores,
 )
 from agents.strategist import StrategistAgent
 from agents.generator import GeneratorAgent
@@ -153,6 +153,24 @@ def _demo_narrative(prompt: str, schema, max_tokens: int = 800):
     )
 
 
+
+# ── canned Reviewer output ──────────────────────────────────────
+def _demo_review(plan, suite) -> ReviewReport:
+    return ReviewReport(
+        issue_number=suite.issue_number,
+        scores=DimensionScores(
+            coverage=4, correctness=4, edge_negative=4,
+            atomicity=5, reproducibility=5, traceability=4,
+            non_redundancy=5, prioritization=5,
+        ),
+        weighted_total=4.4,
+        critical_gaps=[],
+        redundant_cases=[],
+        verdict="ship",
+        top_3_fixes=["Add negative email format tests", "Assert aria-invalid on error state"],
+    )
+
+
 def install_demo_stubs(pipeline, offline: bool = False) -> None:
     """Monkey-patch the four LLM agents on a QAPipeline instance to run offline."""
     # Strategist (formerly Planner)
@@ -164,6 +182,9 @@ def install_demo_stubs(pipeline, offline: bool = False) -> None:
         pipeline.healer._complete_json = _demo_repair
     # Reporter — stub only the narrative call, keep the rule-based gate
     pipeline.reporter._complete_json = _demo_narrative
+    # Reviewer (advisory only — stub to avoid live API call in demo)
+    if pipeline.reviewer is not None:
+        pipeline.reviewer.run = _demo_review
     # Ingestor (optional — only when fully offline)
     if offline:
         pipeline.ingestor.run = lambda ref: demo_issue()

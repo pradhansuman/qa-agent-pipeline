@@ -13,8 +13,8 @@ from typing import Optional
 @dataclass
 class MCPConfig:
     # ── LLM ──────────────────────────────────────────────────────────────
-    anthropic_api_key: str = field(
-        default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
+    openrouter_api_key: str = field(
+        default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
     model: str = field(
         default_factory=lambda: os.getenv(
             "QA_AGENT_MODEL", "claude-sonnet-4-6"))
