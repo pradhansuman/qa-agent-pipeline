@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureBank</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui; background: #f5f7fa; color: #333; }
+        .container { max-width: 800px; margin: 40px auto; padding: 20px; }
+        header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; }
+        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { color: #667eea; margin-bottom: 15px; }
+        input, button { padding: 10px 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 1em; margin: 5px 0; }
+        button { background: #667eea; color: white; cursor: pointer; border: none; }
+        button:hover { background: #764ba2; }
+        .error { color: #e74c3c; }
+        .success { color: #27ae60; }
+        .account-list li { padding: 10px; background: #f8f9fa; margin: 5px 0; border-radius: 4px; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏦 SecureBank</h1>
+            <div>Balance: <strong data-testid="total-balance">$5,000.00</strong></div>
+        </header>
+
+        <div class="card">
+            <h2>Accounts</h2>
+            <ul class="account-list" data-testid="account-list" id="accountList"></ul>
+            <button onclick="addAccount()" data-testid="add-account-btn">+ Add</button>
+        </div>
+
+        <div class="card">
+            <h2>Transfer</h2>
+            <input type="number" id="fromAccount" data-testid="transfer-from" placeholder="From">
+            <input type="number" id="toAccount" data-testid="transfer-to" placeholder="To">
+            <input type="number" id="transferAmount" data-testid="transfer-amount" placeholder="Amount" step="0.01">
+            <button onclick="transfer()" data-testid="transfer-btn">Transfer</button>
+            <div id="transferStatus"></div>
+        </div>
+
+        <div class="card">
+            <h2>History</h2>
+            <div id="transactions" data-testid="transaction-list"></div>
+        </div>
+    </div>
+
+    <script>
+        let accounts = [
+            { id: 1, name: 'Checking', balance: 2500 },
+            { id: 2, name: 'Savings', balance: 2500 },
+        ];
+        let transactions = [];
+
+        function addAccount() {
+            const id = Math.max(...accounts.map(a => a.id)) + 1;
+            accounts.push({ id, name: `Account ${id}`, balance: 0 });
+            renderAccounts();
+        }
+
+        function renderAccounts() {
+            document.getElementById('accountList').innerHTML = accounts.map(a =>
+                `<li><span>${a.name}</span> <strong>$${a.balance.toFixed(2)}</strong></li>`
+            ).join('');
+        }
+
+        function transfer() {
+            const from = parseInt(document.getElementById('fromAccount').value);
+            const to = parseInt(document.getElementById('toAccount').value);
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+            const status = document.getElementById('transferStatus');
+
+            if (!from || !to || !amount) {
+                status.innerHTML = '<div class="error">Fill all fields</div>';
+                return;
+            }
+            if (amount <= 0) {
+                status.innerHTML = '<div class="error">Amount must be positive</div>';
+                return;
+            }
+
+            const fromAcc = accounts.find(a => a.id === from);
+            const toAcc = accounts.find(a => a.id === to);
+
+            if (!fromAcc || !toAcc) {
+                status.innerHTML = '<div class="error">Account not found</div>';
+                return;
+            }
+            if (fromAcc.balance < amount) {
+                status.innerHTML = '<div class="error">Insufficient funds</div>';
+                return;
+            }
+
+            fromAcc.balance -= amount;
+            toAcc.balance += amount;
+            transactions.unshift({ from: fromAcc.name, to: toAcc.name, amount, time: new Date().toLocaleTimeString() });
+
+            status.innerHTML = `<div class="success">Transferred $${amount.toFixed(2)}</div>`;
+            document.getElementById('transferAmount').value = '';
+            renderAccounts();
+            renderTransactions();
+        }
+
+        function renderTransactions() {
+            document.getElementById('transactions').innerHTML = transactions.slice(0, 10).map(t =>
+                `<div>${t.from} → ${t.to}: $${t.amount.toFixed(2)}</div>`
+            ).join('');
+        }
+
+        renderAccounts();
+    </script>
+</body>
+</html>
