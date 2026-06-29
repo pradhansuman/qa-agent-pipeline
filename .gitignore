@@ -1,60 +1,25 @@
-# ── Python ───────────────────────────────────────────────────────
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
-.venv/
-venv/
-env/
-.env
-.env.*
-*.env
+# Generated test artifacts
+test-results-*/
+playwright-report-*/
+*-qa-report.html
+*-qa-report-history.json
+store-qa-report-history.json
 
-# ── Node / Playwright ─────────────────────────────────────────────
+# Dependencies
 node_modules/
-generated/*/node_modules/
-playwright-report/
-playwright-report-math-hub/
-playwright-report-store/
-test-results/
-test-results-store/
-allure-results/
-allure-report/
-blob-report/
-*.zip
+.venv/
+__pycache__/
+*.pyc
 
-# ── QA workspace / temp run artifacts ─────────────────────────────
-.qa-workspace/
+# IDE
+.vscode/
+.idea/
+*.swp
 
-# ── Claude Code local settings (personal tool config, not project) ──
-.claude/
-
-# ── macOS ─────────────────────────────────────────────────────────
+# OS
 .DS_Store
-.AppleDouble
-.LSOverride
 Thumbs.db
 
-# ── IDE ───────────────────────────────────────────────────────────
-.idea/
-.vscode/settings.json
-*.swp
-*.swo
-
-# ── Secrets / credentials (never commit these) ────────────────────
-*.pem
-*.key
-*.p12
-secrets.json
-credentials.json
-
-# ── Generated resume / personal files ────────────────────────────
-Suman/
-Suman_Pradhan_ATS_Resume.*
-generate_resume_pdf.py
-FIREBASE_SETUP.md
+# Temporary
+.tmp/
+*.log
